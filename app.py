@@ -11,15 +11,20 @@ import time
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 ROOT = Path(__file__).resolve().parent
 MODEL_DIR = ROOT / "vendor" / "onfly"
 sys.path.insert(0, str(MODEL_DIR))
+import envload
+envload.load_env(ROOT / ".env")
+import ask_pipeline
+import llm as llm_layer
 import project_store
 import scrapers
+import stt
 log = logging.getLogger("onfly")
 
 
@@ -335,3 +340,75 @@ async def decide(request: Request):
     except (ValueError, UnicodeDecodeError) as exc:
         raise HTTPException(422, "Invalid JSON.") from exc
     return await asyncio.to_thread(runtime.predict, payload)
+
+
+@app.get("/fly")
+def fly_page():
+    page = ROOT / "web" / "fly.html"
+    if not page.is_file():
+        raise HTTPException(404, "The Fly page (web/fly.html) has not been built yet.")
+    return FileResponse(page)
+
+
+@app.get("/api/ask/health")
+def ask_health():
+    llm = llm_layer.LLM()
+    return {"gemini": llm.configured["gemini"], "openrouter": llm.configured["openrouter"],
+            "fake": llm.configured["fake"], "stt": bool((os.environ.get("PAXA_API_KEY") or "").strip()),
+            "model_ready": runtime.status == "ready", "cache_entries": ask_pipeline.AskCache().size()}
+
+
+@app.post("/api/ask")
+async def ask(request: Request):
+    _check_same_origin(request)
+    body = await request.body()
+    if len(body) > 8192:
+        raise HTTPException(413, "Request too large.")
+    try:
+        payload = _json_object(json.loads(body))
+    except (ValueError, UnicodeDecodeError) as exc:
+        raise HTTPException(422, "Send a JSON object with a text field.") from exc
+    text = payload.get("text")
+    if not isinstance(text, str) or not 1 <= len(text.strip()) <= 500:
+        raise HTTPException(422, "text must be 1 to 500 characters.")
+    replay = payload.get("replay", False)
+    if not isinstance(replay, bool):
+        raise HTTPException(422, "replay must be true or false.")
+
+    async def stream():
+        try:
+            async for event in ask_pipeline.run_ask(text.strip(), runtime=runtime, llm=llm_layer.LLM(), replay=replay):
+                yield (json.dumps(event, ensure_ascii=False) + "\n").encode()
+        except Exception:
+            log.exception("Ask stream failed")
+            yield (json.dumps(ask_pipeline._final_error("internal_error", "Unexpected error."), ensure_ascii=False) + "\n").encode()
+
+    return StreamingResponse(stream(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+@app.post("/api/stt")
+async def speech_to_text(request: Request):
+    _check_same_origin(request)
+    try:
+        declared = int(request.headers.get("content-length") or 0)
+    except ValueError:
+        declared = 0
+    if declared > stt.MAX_AUDIO_BYTES + 65536:
+        return JSONResponse({"error": "audio_too_large", "message": "Audio must be 10 MB or smaller."}, status_code=413)
+    if not (os.environ.get("PAXA_API_KEY") or "").strip():
+        return JSONResponse({"error": "stt_not_configured"}, status_code=503)
+    try:
+        body = bytearray()
+        async for chunk in request.stream():
+            body += chunk
+            if len(body) > stt.MAX_AUDIO_BYTES + 65536:
+                raise stt.STTError(413, "audio_too_large", "Audio must be 10 MB or smaller.")
+        fields = stt.parse_multipart(request.headers.get("content-type"), bytes(body))
+        if "audio" not in fields:
+            raise stt.STTError(422, "audio_missing", "Send the recording in the 'audio' field.")
+        filename, content_type, audio = fields["audio"]
+        language = fields["language"][2].decode("utf-8", "replace").strip() if "language" in fields else "th"
+        return await stt.transcribe(audio, filename or "audio.webm", content_type, language or "th")
+    except stt.STTError as exc:
+        return JSONResponse({"error": exc.code, "message": exc.message}, status_code=exc.status)
