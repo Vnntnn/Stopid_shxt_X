@@ -37,6 +37,8 @@ export function mulberry32(seed) {
 
 export const PAD_PAN = { A: -0.85, B: 0.85, none: 0 };
 export function padPan(pad) { return pad in PAD_PAN ? PAD_PAN[pad] : 0; }
+// While the mic records, all fly sound is ducked to this share of the volume so STT is not polluted.
+export const DUCK_GAIN = 0.08;
 export const DECIDE_SECONDS = 3.2;
 export const STATES = ['idle', 'listening', 'thinking', 'deciding', 'landing', 'landed', 'inconclusive', 'speaking'];
 
@@ -97,7 +99,7 @@ export function createFlyAudio(opts = {}) {
 
   let ctx = null;
   let master = null;            // { bus, gain, comp, analyser } persistent
-  let level = 2, muted = false, volume = 0.6;
+  let level = 2, muted = false, volume = 0.6, ducked = false;
   let state = 'idle', info = {}, stateStart = 0;
   let tickHandle = null;
   let bed = null;               // continuous wing buzz
@@ -134,16 +136,17 @@ export function createFlyAudio(opts = {}) {
   const lv = () => levelSettings(level);
   const audible = () => !(doc && doc.hidden);
 
+  const masterTarget = () => (muted ? 0 : volume * 0.9 * (ducked ? DUCK_GAIN : 1));
   function applyMaster() {
     if (!master || !ctx) return;
-    const v = muted ? 0 : volume * 0.9;
-    try { master.gain.gain.setTargetAtTime(v, ctx.currentTime, 0.02); } catch (_) { master.gain.gain.value = v; }
+    const v = masterTarget();
+    try { master.gain.gain.setTargetAtTime(v, ctx.currentTime, ducked ? 0.03 : 0.12); } catch (_) { master.gain.gain.value = v; }
   }
 
   function buildMaster() {
     // bus -> master gain -> limiter -> analyser -> speakers
     const bus = ctx.createGain();
-    const gainM = ctx.createGain(); gainM.gain.value = muted ? 0 : volume * 0.9;
+    const gainM = ctx.createGain(); gainM.gain.value = masterTarget();
     const comp = ctx.createDynamicsCompressor();
     comp.threshold.value = -20; comp.knee.value = 6; comp.ratio.value = 14; comp.attack.value = 0.003; comp.release.value = 0.2;
     const analyser = ctx.createAnalyser(); analyser.fftSize = 1024;
@@ -278,7 +281,7 @@ export function createFlyAudio(opts = {}) {
   }
 
   function playJingle(kind) {
-    if (!ctx || muted || !audible() || !lv().jingle) return;
+    if (!ctx || muted || ducked || !audible() || !lv().jingle) return;
     const t0 = ctx.currentTime + 0.02;
     switch (kind) {
       case 'winA': slideWhistle(t0, 450, 2300, 0.7); kazoo(t0 + 0.75, [[392, 0.14], [392, 0.14], [392, 0.14], [523, 0.5]]); break;
@@ -307,7 +310,7 @@ export function createFlyAudio(opts = {}) {
   }
 
   function playVoice(buffer, o = {}) {
-    if (!ctx || !master || muted || !audible()) return Promise.resolve(false);
+    if (!ctx || !master || muted || ducked || !audible()) return Promise.resolve(false);
     const L = lv();
     const t0 = ctx.currentTime + 0.05;
     const rng = mulberry32(hashSeed(o.seed || 'voice'));
@@ -467,6 +470,8 @@ export function createFlyAudio(opts = {}) {
     setState,
     setMicLevel(v) { micLevel = clamp01(Number(v) || 0); },
     setLevel(l) { level = normLevel(l); if (unlocked) tick(); },
+    setDucked(d) { ducked = !!d; if (ducked) stopVoice(); applyMaster(); },
+    get ducked() { return ducked; },
     setMuted(m) { muted = !!m; applyMaster(); if (muted) stopVoice(); },
     setVolume(v) { volume = clampVol(v); applyMaster(); },
     prepareVoice,
@@ -478,7 +483,7 @@ export function createFlyAudio(opts = {}) {
     stopAll,
     dispose,
     debug() {
-      return { state, rms: rms(), level, muted, volume, ctxState: ctx ? ctx.state : 'none', nodes: live.length, hasBed: !!bed };
+      return { state, rms: rms(), level, muted, volume, ctxState: ctx ? ctx.state : 'none', nodes: live.length, hasBed: !!bed, ducked, masterGain: master ? master.gain.gain.value : null };
     },
     _tick: tick,
   };

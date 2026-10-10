@@ -95,7 +95,7 @@ async function speak(v) {
   engine.stopVoice();
   const buf = v.buffer || (v.failed ? null : await v.promise);
   if (v !== voice) return;
-  if (prefs.muted) return;
+  if (prefs.muted || engine.ducked) return;
   engine.setState('speaking');
   let played = false;
   if (buf) played = await engine.playVoice(buf, { seed: v.text });
@@ -675,7 +675,7 @@ async function startRecording() {
     return;
   }
   try {
-    rec.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    rec.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
   } catch (err) {
     const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
     setMicStatus(denied ? 'Microphone permission was denied. Allow it in the browser, or use Text.' : 'No microphone found or it is busy. Use Text instead.');
@@ -688,6 +688,7 @@ async function startRecording() {
   rec.recorder.ondataavailable = (e) => { if (e.data && e.data.size) rec.chunks.push(e.data); };
   rec.recorder.onstop = onRecorded;
   rec.recorder.start(250);
+  engine.setDucked(true);
   try {
     rec.ctx = new (window.AudioContext || window.webkitAudioContext)();
     const an = rec.ctx.createAnalyser();
@@ -721,6 +722,7 @@ function stopRecording(discard = false) {
   $('meter-bar').style.width = '0%';
   $('mic').setAttribute('aria-pressed', 'false');
   $('mic').setAttribute('aria-label', 'Start recording');
+  engine.setDucked(false);
   try { rec.recorder.stop(); } catch (_) { /* already stopped */ }
   rec.stream?.getTracks().forEach((t) => t.stop());
   rec.ctx?.close().catch(() => {});
@@ -762,9 +764,10 @@ function browserSpeechFallback(reason) {
   r.interimResults = false;
   r.maxAlternatives = 1;
   fly('listening');
+  engine.setDucked(true);
   r.onresult = (e) => { const t = e.results[0][0].transcript; setMicStatus('Heard you. Check the text, it will send in a moment.'); showTranscript(t); };
   r.onerror = (e) => setMicStatus(e.error === 'not-allowed' ? 'Microphone permission was denied.' : `Browser speech recognition failed (${e.error}). Use Text.`);
-  r.onend = () => fly('idle');
+  r.onend = () => { engine.setDucked(false); fly('idle'); };
   try { r.start(); } catch (_) { setMicStatus('Could not start browser speech recognition. Use Text.'); }
 }
 

@@ -265,3 +265,28 @@ test('hidden tab suspends the context and stops sound; visible resumes', async (
   assert.equal(f.Ctx.last.state, 'running');
   engine.stopAll();
 });
+
+test('ducking: master gain drops to <= 8% while recording, blocks voice/jingles, and restores after', async () => {
+  const { f, engine } = await make();
+  const { DUCK_GAIN } = await load();
+  engine.unlock(); engine.setVolume(0.5); engine.setLevel(2);
+  const comp = f.all.find((n) => n.kind === 'comp');
+  const master = f.all.find((n) => n.kind === 'gain' && n.out.includes(comp));
+  const normal = master.gain.value;
+  assert.ok(normal > 0.4);
+  assert.ok(DUCK_GAIN <= 0.08);
+  engine.setDucked(true);
+  assert.ok(master.gain.value <= normal * 0.08 + 1e-9, `ducked ${master.gain.value}`);
+  assert.ok(master.gain.value > 0, 'ducked, not muted');
+  const last = master.gain.calls[master.gain.calls.length - 1];
+  assert.equal(last[0], 'target'); assert.ok(last[3] > 0, 'ramped, not a hard cut');
+  const n = f.all.length;
+  assert.equal(await engine.playVoice({ duration: 1 }), false);
+  engine.playJingle('winA');
+  assert.equal(f.all.length, n, 'no voice or jingle while ducked');
+  engine.setVolume(1); assert.ok(master.gain.value <= 0.9 * 0.08 + 1e-9, 'volume changes stay ducked');
+  engine.setDucked(false);
+  assert.ok(Math.abs(master.gain.value - 0.9) < 1e-9, 'restored to the current volume');
+  engine.setMuted(true); engine.setDucked(true); engine.setDucked(false); assert.equal(master.gain.value, 0, 'mute still wins');
+  engine.stopAll();
+});
