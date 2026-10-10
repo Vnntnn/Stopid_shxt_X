@@ -59,15 +59,17 @@
     </div>
   </section>
 
-  <section class="panel out" aria-labelledby="out-title">
-    <h2 id="out-title">Output fly</h2>
+  <section class="panel out" id="out" aria-labelledby="out-title">
+    <div class="out-head">
+      <h2 id="out-title">Output fly</h2>
+      <button type="button" class="mini" id="expand" aria-pressed="false" title="Show the output in a large drawer for debugging">Expand</button>
+    </div>
     <p class="empty" id="out-empty">Ask something to see the Fly think.</p>
-    <ol class="stages" id="stages" aria-live="polite" hidden></ol>
     <div id="error" class="error" role="alert" hidden>
       <span id="error-msg"></span>
       <button type="button" id="retry">Retry</button>
     </div>
-    <div id="result" hidden>
+    <div id="result" class="result" hidden>
       <p class="echo" id="echo"></p>
       <p class="answer" id="answer"></p>
       <ul class="bars" id="bars"></ul>
@@ -76,10 +78,14 @@
         <span class="chip" id="cache" hidden>from cache</span>
         <span class="chip" id="infer"></span>
       </div>
-      <details class="runs"><summary>Jev runs: forward vs swapped</summary><table id="runs"></table></details>
-      <div class="sources"><h3>Sources</h3><ul id="sources"></ul></div>
+      <div class="src-row" id="src-row" hidden><h3 id="src-title">Sources</h3><ul class="src-chips" id="sources"></ul></div>
       <p class="disclaimer" id="disclaimer"></p>
     </div>
+    <div class="stages-bar" id="stages-bar" hidden>
+      <h3>How the Fly got there</h3>
+      <button type="button" class="mini" id="toggle-cards">Expand all</button>
+    </div>
+    <ol class="stages" id="stages" aria-live="polite" hidden></ol>
   </section>
 </main>
 <script type="module" src="/static/fly.js"></script>
