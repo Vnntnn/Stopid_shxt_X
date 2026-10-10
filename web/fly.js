@@ -2,6 +2,7 @@ import { STAGES, newState, applyEvent, parseNdjsonStream } from '/static/fly-str
 import { createScene } from '/static/fly-scene.js';
 import { createFlyAudio } from '/static/fly-audio.js';
 import { flySpeech } from '/static/fly-speak.js';
+import { tokenizeJson, sessionExport, exportFileName, byteSize, formatBytes, makeEventRecord, collapseState, toggleCollapsed, collapseAll, expandAll, allCollapsed, LARGE_BYTES } from '/static/fly-json.js';
 import { hostnameOf, formatCost, formatPct, formatSeconds, clampText, safeHttpUrl, deriveChecks } from '/static/fly-format.js';
 
 const $ = (id) => document.getElementById(id);
@@ -537,6 +538,7 @@ async function ask(text) {
   controller = new AbortController();
   const mine = controller;
   starts = {};
+  const myRun = newRun(text, $('replay').checked);
   clearInterval(tick);
   $('result').hidden = true;
   $('error').hidden = true;
@@ -544,6 +546,7 @@ async function ask(text) {
   $('send').disabled = true;
   let state = newState();
   renderStages(state);
+  scheduleRaw();
   fly('thinking');
   scene.setCandidates([]);
   tick = setInterval(() => {
@@ -566,7 +569,10 @@ async function ask(text) {
     await parseNdjsonStream(res.body, (ev) => {
       if (ev.status === 'start' && STAGES.includes(ev.stage)) starts[ev.stage] = performance.now();
       state = applyEvent(state, ev);
+      myRun.events.push(makeEventRecord(ev, performance.now() - myRun.t0));
+      if (ev.stage === 'final') { if (state.final) myRun.final = state.final; if (state.error) myRun.error = state.error; }
       renderStages(state);
+      scheduleRaw();
     });
     if (state.final) {
       voice = startVoice(state.final);
@@ -584,11 +590,253 @@ async function ask(text) {
   } catch (err) {
     if (mine.signal.aborted) return;
     fly('idle');
-    showError(err.message || String(err));
+    const message = err.message || String(err);
+    if (!myRun.error) myRun.error = { message };
+    if (!myRun.events.some((r) => r.stage === 'final' && r.status === 'error')) myRun.events.push(makeEventRecord({ stage: 'client', status: 'error', error: { message } }, performance.now() - myRun.t0));
+    scheduleRaw();
+    showError(message);
   } finally {
+    myRun.done = true;
     if (controller === mine) { clearInterval(tick); $('send').disabled = false; }
+    scheduleRaw();
   }
 }
+
+
+// ---- Raw JSON view: the whole run as JSON (Final / Stream / Session) ----
+const VIEW_KEY = 'fly.view';
+const RAW_PREFS_KEY = 'fly.raw';
+let run = null; // {request, events:[{t_ms,stage,status,event}], final, error, t0, done}
+const rawPrefs = { tab: 'final', wrap: true };
+try {
+  const j = JSON.parse(localStorage.getItem(RAW_PREFS_KEY) || '{}');
+  if (['final', 'stream', 'session'].includes(j.tab)) rawPrefs.tab = j.tab;
+  if (typeof j.wrap === 'boolean') rawPrefs.wrap = j.wrap;
+} catch (_) { /* storage blocked: defaults */ }
+function saveRawPrefs() { try { localStorage.setItem(RAW_PREFS_KEY, JSON.stringify(rawPrefs)); } catch (_) { /* ignore */ } }
+const LINE_STEP = 1500;
+let rawTabs = {};
+function resetRaw() {
+  rawTabs = {};
+  for (const t of ['final', 'stream', 'session']) rawTabs[t] = { cs: collapseState(), full: new Set(), cap: LINE_STEP, scroll: 0 };
+}
+resetRaw();
+function newRun(text, replay) {
+  run = { request: { text, replay: !!replay, startedAt: new Date().toISOString() }, events: [], final: null, error: null, t0: performance.now(), done: false };
+  resetRaw();
+  return run;
+}
+let view = 'cards';
+let rawRaf = 0;
+function scheduleRaw() {
+  if (view !== 'raw' || rawRaf) return;
+  rawRaf = requestAnimationFrame(() => { rawRaf = 0; renderRaw(); });
+}
+function rawData(tab) {
+  if (!run) return undefined;
+  if (tab === 'final') return run.final || undefined;
+  if (tab === 'stream') return run.events;
+  return sessionExport(run);
+}
+function rawHint(v) {
+  if (v && typeof v === 'object' && 't_ms' in v && 'stage' in v) return `+${v.t_ms} ms ${v.stage}/${v.status}`;
+  return '';
+}
+function rawMessage(tab) {
+  if (!run) return 'No run yet. Ask something and the JSON appears here.';
+  if (tab === 'final') return run.done && !run.final ? 'No final event: the run ended with an error. See Stream or Session.' : 'Waiting for the final event...';
+  return '';
+}
+function rawPill() {
+  const pill = $('rawpill');
+  const parts = [];
+  const f = run && run.final;
+  if (!run) parts.push(el('span', 'muted', 'No run yet'));
+  else if (f) {
+    const d = f.decision;
+    const p = el('span', 'pill', d === 'inconclusive' ? 'inconclusive' : tag(d));
+    p.dataset.id = d;
+    parts.push(p);
+    const c = (f.candidates || []).find((x) => x.id === d);
+    if (c) parts.push(el('span', 'rawpill-t', `${c.label || c.id} ${formatPct(c.prob || 0)}`));
+    if (f.from_cache) parts.push(el('span', 'chip', 'from cache'));
+  } else if (run.error) parts.push(el('span', 'rawpill-t bad', 'Failed: ' + (run.error.message || 'error')));
+  else {
+    const running = lastState && STAGES.find((s) => lastState.stages[s].status === 'running');
+    parts.push(el('span', 'rawpill-t', running ? `Running: ${STAGE_LABEL[running]}` : 'Running...'));
+  }
+  pill.replaceChildren(...parts);
+}
+
+function treeLine(line) {
+  const d = document.createElement('div');
+  d.className = 'jl' + (line.closing ? ' close' : '');
+  d.style.setProperty('--d', String(line.depth));
+  if (line.toggle) {
+    const b = el('button', 'jcaret', line.toggle.collapsed ? '▸' : '▾');
+    b.type = 'button';
+    b.dataset.act = 'fold'; b.dataset.path = line.path; b.dataset.depth = String(line.depth);
+    b.setAttribute('aria-expanded', String(!line.toggle.collapsed));
+    b.setAttribute('aria-label', (line.toggle.collapsed ? 'Expand ' : 'Collapse ') + (line.path || 'root'));
+    d.append(b);
+  }
+  for (const t of line.tokens) {
+    const s = el('span', 'j-' + t.t, t.v);
+    if (t.t === 'str' && t.k === 'status' && t.v === '"error"') s.classList.add('j-bad');
+    d.append(s);
+    if (t.more) {
+      const m = el('button', 'linkbtn jmore', `… +${t.more.hidden} chars, show full`);
+      m.type = 'button'; m.dataset.act = 'full'; m.dataset.path = t.more.path;
+      d.append(m);
+    }
+  }
+  return d;
+}
+
+function renderRaw() {
+  if (view !== 'raw') return;
+  const tab = rawPrefs.tab;
+  const st = rawTabs[tab];
+  const pane = $('rawpane');
+  rawPill();
+  for (const b of $('raw-tabs').children) { const on = b.dataset.tab === tab; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }
+  $('raw-wrap').setAttribute('aria-pressed', String(rawPrefs.wrap));
+  pane.classList.toggle('nowrap', !rawPrefs.wrap);
+  const data = rawData(tab);
+  const empty = data === undefined || (tab === 'stream' && !data.length);
+  $('raw-copy').disabled = empty; $('raw-dl').disabled = empty; $('raw-fold').disabled = empty;
+  $('raw-fold').textContent = allCollapsed(st.cs) ? 'Expand all' : 'Collapse all';
+  if (empty) {
+    $('raw-size').textContent = '';
+    pane.replaceChildren(el('p', 'rawempty', rawMessage(tab) || 'No events yet...'));
+    return;
+  }
+  const bytes = byteSize(data);
+  const nEv = run ? run.events.length : 0;
+  $('raw-size').textContent = formatBytes(bytes) + (tab === 'final' ? '' : ` · ${nEv} event${nEv === 1 ? '' : 's'}`) + (bytes > LARGE_BYTES ? ' · large: long strings shortened' : '');
+  const keep = st.scroll;
+  const follow = tab !== 'final' && pane.scrollHeight - pane.scrollTop - pane.clientHeight < 40 && !run.done;
+  const { lines, capped } = tokenizeJson(data, { collapse: st.cs, fullPaths: st.full, maxLines: st.cap, hint: rawHint });
+  const frag = document.createDocumentFragment();
+  for (const l of lines) frag.append(treeLine(l));
+  if (capped) {
+    const m = el('button', 'mini jmore-lines', `Show ${LINE_STEP} more lines`);
+    m.type = 'button'; m.dataset.act = 'lines';
+    frag.append(m);
+  }
+  pane.replaceChildren(frag);
+  pane.scrollTop = follow ? pane.scrollHeight : keep;
+  if (rawFocus) {
+    const sel = [...pane.querySelectorAll('button[data-act]')].find((b) => b.dataset.act === rawFocus.act && b.dataset.path === rawFocus.path);
+    rawFocus = null;
+    if (sel) sel.focus({ preventScroll: true });
+  }
+}
+let rawFocus = null;
+
+$('rawpane').addEventListener('scroll', () => { if (rawTabs[rawPrefs.tab]) rawTabs[rawPrefs.tab].scroll = $('rawpane').scrollTop; });
+$('rawpane').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-act]');
+  if (!b) return;
+  const st = rawTabs[rawPrefs.tab];
+  st.scroll = $('rawpane').scrollTop;
+  rawFocus = { act: b.dataset.act, path: b.dataset.path };
+  if (b.dataset.act === 'fold') st.cs = toggleCollapsed(st.cs, b.dataset.path, Number(b.dataset.depth));
+  else if (b.dataset.act === 'full') { st.full.add(b.dataset.path); rawFocus = null; }
+  else if (b.dataset.act === 'lines') { st.cap += LINE_STEP; rawFocus = null; }
+  renderRaw();
+});
+$('raw-fold').addEventListener('click', () => {
+  const st = rawTabs[rawPrefs.tab];
+  st.cs = allCollapsed(st.cs) ? expandAll() : collapseAll();
+  st.scroll = 0;
+  renderRaw();
+  $('rawpane').scrollTop = 0;
+});
+$('raw-wrap').addEventListener('click', () => { rawPrefs.wrap = !rawPrefs.wrap; saveRawPrefs(); renderRaw(); });
+
+function rawText() {
+  const data = rawData(rawPrefs.tab);
+  if (data === undefined) return null;
+  try { return JSON.stringify(data, null, 2); } catch (_) { return null; }
+}
+async function copyToClipboard(text) {
+  try { await navigator.clipboard.writeText(text); return true; } catch (_) { /* fall through to the textarea */ }
+  const ta = el('textarea', 'sr-only');
+  ta.value = text; ta.setAttribute('aria-hidden', 'true');
+  document.body.append(ta); ta.select();
+  let ok = false;
+  try { ok = document.execCommand('copy'); } catch (_) { ok = false; }
+  ta.remove();
+  return ok;
+}
+function flash(btn, text, status, ms = 1600) {
+  const old = btn.dataset.label || btn.textContent;
+  btn.dataset.label = old;
+  btn.textContent = text;
+  $('raw-status').textContent = status;
+  clearTimeout(btn._t);
+  btn._t = setTimeout(() => { btn.textContent = old; $('raw-status').textContent = ''; }, ms);
+}
+$('raw-copy').addEventListener('click', async () => {
+  const text = rawText();
+  if (text == null) return;
+  const ok = await copyToClipboard(text);
+  flash($('raw-copy'), ok ? 'Copied' : 'Copy failed', ok ? 'Copied to clipboard' : 'Copy failed');
+});
+$('raw-dl').addEventListener('click', () => {
+  const text = rawText();
+  if (text == null) return;
+  const name = exportFileName(new Date());
+  const url = URL.createObjectURL(new Blob([text], { type: 'application/json' }));
+  const a = document.createElement('a');
+  a.href = url; a.download = name; a.hidden = true;
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  flash($('raw-dl'), 'Saved', 'Downloaded ' + name);
+});
+
+function wireTabs(box, attr, onSelect) {
+  const tabs = () => [...box.querySelectorAll('[role="tab"]')];
+  box.addEventListener('click', (e) => { const b = e.target.closest('[role="tab"]'); if (b) onSelect(b.dataset[attr]); });
+  box.addEventListener('keydown', (e) => {
+    const list = tabs();
+    const i = list.indexOf(document.activeElement);
+    if (i < 0) return;
+    let j = -1;
+    if (e.key === 'ArrowRight') j = (i + 1) % list.length;
+    else if (e.key === 'ArrowLeft') j = (i - 1 + list.length) % list.length;
+    else if (e.key === 'Home') j = 0;
+    else if (e.key === 'End') j = list.length - 1;
+    if (j < 0) return;
+    e.preventDefault();
+    onSelect(list[j].dataset[attr]);
+    list[j].focus();
+  });
+}
+function setRawTab(t) {
+  if (!rawTabs[t]) return;
+  rawTabs[rawPrefs.tab].scroll = $('rawpane').scrollTop;
+  rawPrefs.tab = t; saveRawPrefs();
+  renderRaw();
+  $('rawpane').scrollTop = rawTabs[t].scroll;
+}
+function setView(v, persist = true) {
+  view = v === 'raw' ? 'raw' : 'cards';
+  $('out').dataset.view = view;
+  for (const b of $('view-seg').children) { const on = b.dataset.view === view; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }
+  $('rawview').hidden = view !== 'raw';
+  if (persist) { try { localStorage.setItem(VIEW_KEY, view); } catch (_) { /* ignore */ } }
+  if (view === 'raw') { renderRaw(); $('rawpane').scrollTop = rawTabs[rawPrefs.tab].scroll; }
+}
+wireTabs($('view-seg'), 'view', setView);
+wireTabs($('raw-tabs'), 'tab', setRawTab);
+{
+  let saved = 'cards';
+  try { saved = localStorage.getItem(VIEW_KEY) || 'cards'; } catch (_) { /* ignore */ }
+  setView(saved, false);
+}
+if (params.has('mock')) window.__flyRaw = { setRun(r) { run = r; resetRaw(); renderRaw(); } };
 
 // ---- Output panel controls ----
 $('expand').addEventListener('click', () => {
