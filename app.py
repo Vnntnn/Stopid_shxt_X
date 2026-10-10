@@ -353,8 +353,7 @@ def fly_page():
 @app.get("/api/ask/health")
 def ask_health():
     llm = llm_layer.LLM()
-    return {"gemini": llm.configured["gemini"], "openrouter": llm.configured["openrouter"],
-            "fake": llm.configured["fake"], "stt": bool((os.environ.get("PAXA_API_KEY") or "").strip()),
+    return {"openrouter": llm.configured["openrouter"], "fake": llm.configured["fake"], "stt": bool((os.environ.get("PAXA_API_KEY") or "").strip()),
             "model_ready": runtime.status == "ready", "cache_entries": ask_pipeline.AskCache().size()}
 
 

@@ -37,9 +37,9 @@ class FakeAgent:
 
 
 class FakeRuntime:
-    """Scripted stand-in for app.Runtime. `prefer` = ("key", "A") | ("text", "People's Party ahead") | ("probs", {...})."""
+    """Scripted stand-in for app.Runtime. `prefer` = ("key", "A") | ("text", "People's Party") | ("probs", {...})."""
 
-    def __init__(self, prefer=("text", "People's Party ahead"), top=0.7, agent=None, status="ready", bad_choice=None):
+    def __init__(self, prefer=("text", "People's Party"), top=0.7, agent=None, status="ready", bad_choice=None):
         self.agent, self.status, self.error = agent or FakeAgent(), status, None
         self.prefer, self.top, self.bad_choice, self.payloads = prefer, top, bad_choice, []
 
@@ -93,196 +93,241 @@ class EnvLoaderTests(unittest.TestCase):
         self.assertEqual(envload.load_env(Path("/nonexistent/.env")), [])
 
 
-def gemini_json(obj):
-    return {"candidates": [{"content": {"parts": [{"text": json.dumps(obj)}]}}]}
+def answer_json(**over):
+    data = {"echo": "I understood: x", "language": "en", "parties": [{"id": "A", "name": "One", "aliases": []},
+                                                                      {"id": "B", "name": "Two", "aliases": ["t"]}],
+            "criterion": "is ahead in the latest polls",
+            "facts": [{"text": "One leads by two points.", "source_title": "T", "source_url": "https://a.example/1"},
+                      {"text": "Two is close behind.", "source_title": "", "source_url": ""}], "as_of": "2026-05"}
+    data.update(over)
+    return data
 
 
-VALID_INTERP = {"language": "en", "intent": "compare", "time_scope": "now", "question_en": "Who leads?", "echo": "I understood: x",
-                "parties": [{"id": "A", "name": "One", "aliases": []}, {"id": "B", "name": "Two", "aliases": []}]}
+def or_response(content, annotations=None, usage=None):
+    return {"choices": [{"message": {"content": content if isinstance(content, str) else json.dumps(content),
+                                     "annotations": annotations or []}}], "usage": usage or {"prompt_tokens": 100, "completion_tokens": 50}}
+
+
+CITE = [{"type": "url_citation", "url_citation": {"url": "https://c.example/p", "title": "C", "content": "snippet text"}}]
 
 
 class LLMTests(unittest.IsolatedAsyncioTestCase):
-    async def test_gemini_json_request_shape_and_no_tools(self):
-        seen = []
-
-        def handler(request):
-            seen.append(request)
-            return httpx.Response(200, json=gemini_json({"ok": 1}))
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "k-test", "GEMINI_MODEL": "m-test"}, httpx.MockTransport(handler))
-        self.assertEqual(await llm.json("x", "sys", "usr"), {"ok": 1})
-        request, body = seen[0], json.loads(seen[0].content)
-        self.assertTrue(str(request.url).endswith("/models/m-test:generateContent"))
-        self.assertEqual(request.headers["x-goog-api-key"], "k-test")
-        self.assertEqual(body["generationConfig"]["responseMimeType"], "application/json")
-        self.assertNotIn("tools", body)
-
-    async def test_gemini_research_uses_search_tool_not_json_mode(self):
-        seen = []
-
-        def handler(request):
-            seen.append(json.loads(request.content))
-            return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "notes"}]}, "groundingMetadata": {
-                "groundingChunks": [{"web": {"uri": "https://a.example/1", "title": "A"}},
-                                    {"web": {"uri": "https://a.example/1", "title": "dup"}}, {"web": {"uri": "https://b.example", "title": "B"}}]}}]})
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "k"}, httpx.MockTransport(handler))
-        result = await llm.research("s", "u")
-        self.assertEqual(seen[0]["tools"], [{"google_search": {}}])
-        self.assertNotIn("generationConfig", seen[0])
-        self.assertEqual(result["text"], "notes")
-        self.assertEqual([s["url"] for s in result["sources"]], ["https://a.example/1", "https://b.example"])
-
-    async def test_openrouter_json_and_online_research_with_citations(self):
-        seen = []
-
-        def handler(request):
-            body = json.loads(request.content)
-            seen.append((request, body))
-            if "response_format" in body:
-                return httpx.Response(200, json={"choices": [{"message": {"content": "{\"a\": 1}"}}]})
-            return httpx.Response(200, json={"choices": [{"message": {"content": "notes", "annotations": [
-                {"type": "url_citation", "url_citation": {"url": "https://c.example", "title": "C", "content": "snip"}}]}}]})
-        llm = llm_layer.LLM({"LLM_PROVIDER": "openrouter", "OPENROUTER_API_KEY": "or-k", "OPENROUTER_MODEL": "vendor/model:online"},
+    def make(self, handler, env=None):
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "or-k", "OPENROUTER_MODEL": "vendor/model", **(env or {})},
                             httpx.MockTransport(handler))
-        self.assertEqual(await llm.json("t", "s", "u"), {"a": 1})
-        research = await llm.research("s", "u")
-        self.assertEqual(seen[0][1]["model"], "vendor/model")  # no web search for the JSON stages
-        self.assertEqual(seen[0][1]["response_format"], {"type": "json_object"})
-        self.assertEqual(seen[0][0].headers["authorization"], "Bearer or-k")
-        self.assertEqual(seen[1][1]["model"], "vendor/model:online")
-        self.assertEqual(research["sources"], [{"title": "C", "url": "https://c.example", "snippet": "snip"}])
+        llm.client.backoff = 0
+        return llm
 
-    async def test_retry_once_on_429_then_success(self):
+    async def test_single_call_request_shape_with_web_plugin(self):
+        seen = []
+
+        def handler(request):
+            seen.append((request, json.loads(request.content)))
+            return httpx.Response(200, json=or_response(answer_json(), CITE))
+        result = await self.make(handler).ask("sys", "usr")
+        request, body = seen[0]
+        self.assertEqual(len(seen), 1)
+        self.assertEqual(request.headers["authorization"], "Bearer or-k")
+        self.assertEqual(body["model"], "vendor/model")
+        self.assertEqual(body["temperature"], 0)
+        self.assertLessEqual(body["max_tokens"], 400)
+        self.assertEqual(body["plugins"], [{"id": "web", "max_results": 2}])
+        self.assertEqual(body["reasoning"], {"enabled": False})
+        self.assertEqual(body["response_format"], {"type": "json_object"})
+        self.assertTrue(result["grounded"])
+        self.assertEqual(result["sources"], [{"title": "C", "url": "https://c.example/p", "snippet": "snippet text"}])
+        self.assertEqual(result["data"]["language"], "en")
+
+    async def test_fenced_json_is_parsed(self):
+        llm = self.make(lambda r: httpx.Response(200, json=or_response("```json\n" + json.dumps(answer_json()) + "\n```")))
+        self.assertEqual((await llm.ask("s", "u"))["data"]["criterion"], "is ahead in the latest polls")
+
+    async def test_web_failure_retries_once_without_web_plugin(self):
+        for status in (402, 429, 500):
+            bodies = []
+
+            def handler(request, status=status):
+                body = json.loads(request.content)
+                bodies.append(body)
+                return httpx.Response(status) if "plugins" in body else httpx.Response(200, json=or_response(answer_json(), CITE))
+            with self.subTest(status=status):
+                result = await self.make(handler).ask("sys", "usr")
+                self.assertFalse(result["grounded"])
+                self.assertEqual(result["sources"], [])  # citations are never kept for an ungrounded answer
+                self.assertNotIn("plugins", bodies[-1])
+                self.assertIn("No web access", bodies[-1]["messages"][0]["content"])
+                self.assertEqual(bodies[-1]["model"], "vendor/model")
+
+    async def test_timeout_and_transport_errors_fall_back_but_parse_errors_do_not(self):
+        calls = []
+
+        def boom(request):
+            calls.append(json.loads(request.content))
+            if "plugins" in calls[-1]:
+                raise httpx.ConnectError("x")
+            return httpx.Response(200, json=or_response(answer_json()))
+        self.assertFalse((await self.make(boom).ask("s", "u"))["grounded"])
+        calls.clear()
+
+        def junk(request):
+            calls.append(1)
+            return httpx.Response(200, content=b"<html>")
+        with self.assertRaises(llm_layer.LLMError) as ctx:
+            await self.make(junk).ask("s", "u")
+        self.assertEqual((ctx.exception.code, len(calls)), ("bad_response", 1))
+
+    async def test_401_does_not_fall_back_and_both_failing_raises(self):
         calls = []
 
         def handler(request):
             calls.append(1)
-            return httpx.Response(429) if len(calls) == 1 else httpx.Response(200, json=gemini_json({"ok": True}))
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "k"}, httpx.MockTransport(handler))
-        llm.chain[0].backoff = 0
-        self.assertEqual(await llm.json("t", "s", "u"), {"ok": True})
-        self.assertEqual(len(calls), 2)
+            return httpx.Response(401)
+        with self.assertRaises(llm_layer.LLMError) as ctx:
+            await self.make(handler).ask("s", "u")
+        self.assertEqual((ctx.exception.code, len(calls)), ("http_401", 1))
+        with self.assertRaises(llm_layer.LLMError) as ctx:
+            await self.make(lambda r: httpx.Response(402)).ask("s", "u")
+        self.assertEqual(ctx.exception.code, "http_402")
 
-    async def test_fallback_to_other_provider_on_http_error(self):
-        hosts = []
+    async def test_429_is_retried_once_before_giving_up_on_web(self):
+        calls = []
 
         def handler(request):
-            hosts.append(request.url.host)
-            if request.url.host == "generativelanguage.googleapis.com":
-                return httpx.Response(500)
-            return httpx.Response(200, json={"choices": [{"message": {"content": "{\"from\": \"or\"}"}}]})
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "g", "OPENROUTER_API_KEY": "o"}, httpx.MockTransport(handler))
-        for client in llm.chain:
-            client.backoff = 0
-        self.assertEqual(await llm.json("t", "s", "u"), {"from": "or"})
-        self.assertEqual(llm.used, "openrouter")
-        self.assertEqual(hosts.count("generativelanguage.googleapis.com"), 2)  # one retry, then fallback
+            calls.append(json.loads(request.content))
+            return httpx.Response(429) if len(calls) == 1 else httpx.Response(200, json=or_response(answer_json(), CITE))
+        result = await self.make(handler).ask("s", "u")
+        self.assertTrue(result["grounded"])
+        self.assertEqual(len(calls), 2)
 
-    async def test_no_fallback_without_other_key_and_error_is_mapped(self):
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "g"}, httpx.MockTransport(lambda r: httpx.Response(401)))
+    async def test_provider_selection(self):
+        self.assertEqual(llm_layer.LLM({"OPENROUTER_API_KEY": "k", "LLM_PROVIDER": ""}).primary, "openrouter")
         with self.assertRaises(llm_layer.LLMError) as ctx:
-            await llm.json("t", "s", "u")
-        self.assertEqual(ctx.exception.code, "http_401")
+            await llm_layer.LLM({"OPENROUTER_API_KEY": "k", "LLM_PROVIDER": "gemini"}).ask("s", "u")
+        self.assertEqual(ctx.exception.code, "bad_provider")
         with self.assertRaises(llm_layer.LLMError) as ctx:
-            await llm_layer.LLM({}).json("t", "s", "u")
+            await llm_layer.LLM({}).ask("s", "u")
         self.assertEqual(ctx.exception.code, "not_configured")
 
     async def test_fake_client_is_labelled_and_deterministic(self):
         llm = llm_layer.LLM({"LLM_PROVIDER": "fake"})
-        research = await llm.research("s", "u")
-        self.assertEqual(len(research["sources"]), 3)
-        self.assertTrue(all("FAKE-DEMO" in s["title"] and "FAKE-DEMO" in s["snippet"] for s in research["sources"]))
-        interp = await llm.json("interpret", "s", "u", context={"text": DEMO})
-        self.assertEqual([p["name"] for p in interp["parties"]], ["People's Party", "Bhumjaithai"])
-        self.assertEqual(interp, await llm.json("interpret", "s", "u", context={"text": DEMO}))
+        result = await llm.ask("s", "u", context={"text": DEMO})
+        self.assertEqual(len(result["sources"]), 3)
+        self.assertTrue(all("FAKE-DEMO" in s["snippet"] for s in result["sources"]))
+        self.assertTrue(all("FAKE-DEMO" in f["text"] for f in result["data"]["facts"]))
+        self.assertEqual([p["name"] for p in result["data"]["parties"]], ["People's Party", "Bhumjaithai"])
+        self.assertEqual(result, await llm.ask("s", "u", context={"text": DEMO}))
+
+    def test_gemini_is_fully_removed(self):
+        import re
+        for name in ("llm.py", "ask_pipeline.py", "app.py", ".env.example", "stt.py"):
+            text = (ROOT / name).read_text()
+            self.assertIsNone(re.search(r"GEMINI|GeminiClient|generativelanguage|grounding", text), name)
+        self.assertFalse(hasattr(llm_layer, "GeminiClient"))
 
 
-class RepairTests(unittest.IsolatedAsyncioTestCase):
-    async def test_invalid_json_is_repaired_once_with_the_error_in_the_prompt(self):
-        prompts = []
-        bad = dict(VALID_INTERP, parties=VALID_INTERP["parties"] + [{"id": "C", "name": "Three", "aliases": []}])
+class ValidationTests(unittest.IsolatedAsyncioTestCase):
+    def test_valid_answer_passes(self):
+        out = ask_pipeline.validate_answer(answer_json())
+        self.assertEqual([p["name"] for p in out["parties"]], ["One", "Two"])
+        self.assertEqual(len(out["facts"]), 2)
 
-        def handler(request):
-            prompts.append(json.loads(request.content)["contents"][0]["parts"][0]["text"])
-            return httpx.Response(200, json=gemini_json(bad if len(prompts) == 1 else VALID_INTERP))
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "k"}, httpx.MockTransport(handler))
-        result = await ask_pipeline.llm_json(llm, "interpret", "s", "u", ask_pipeline.validate_interpretation, {})
-        self.assertEqual(len(prompts), 2)
-        self.assertIn("exactly 2 parties", prompts[1])
-        self.assertEqual(result["parties"][1]["name"], "Two")
+    def test_extra_top_level_keys_are_dropped(self):
+        out = ask_pipeline.validate_answer(answer_json(reasoning="blah", extra=1))
+        self.assertNotIn("extra", out)
 
-    async def test_second_failure_is_a_clean_stage_error(self):
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "k"}, httpx.MockTransport(
-            lambda r: httpx.Response(200, json=gemini_json({"language": "en"}))))
-        with self.assertRaises(ask_pipeline.StageError) as ctx:
-            await ask_pipeline.llm_json(llm, "interpret", "s", "u", ask_pipeline.validate_interpretation, {})
-        self.assertEqual(ctx.exception.code, "invalid_llm_output")
+    def test_more_than_three_facts_truncated_and_long_fact_cut_to_22_words(self):
+        facts = [{"text": " ".join(["word"] * 40), "source_title": "", "source_url": ""} for _ in range(6)]
+        out = ask_pipeline.validate_answer(answer_json(facts=facts))
+        self.assertEqual(len(out["facts"]), 3)
+        self.assertEqual(len(out["facts"][0]["text"].split()), 22)
+        out = ask_pipeline.validate_answer(answer_json(criterion=" ".join(["w"] * 30) + "?"))
+        self.assertEqual(len(out["criterion"].split()), 12)
 
-    async def test_non_json_text_is_repaired_too(self):
-        texts = iter(["not json at all", json.dumps(VALID_INTERP)])
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "k"}, httpx.MockTransport(lambda r: httpx.Response(
-            200, json={"candidates": [{"content": {"parts": [{"text": next(texts)}]}}]})))
-        result = await ask_pipeline.llm_json(llm, "interpret", "s", "u", ask_pipeline.validate_interpretation, {})
-        self.assertEqual(result["language"], "en")
-
-    def test_validators_reject_wrong_shapes(self):
-        for mutate in (lambda d: d.pop("echo"), lambda d: d.update(parties="x"),
-                       lambda d: d["parties"][0].update(id="B"), lambda d: d.update(question_en="ใครชนะ")):
-            data = json.loads(json.dumps(VALID_INTERP))
+    def test_wrong_shapes_are_rejected(self):
+        bad = [lambda d: d.pop("echo"), lambda d: d.pop("facts"), lambda d: d.update(parties="x"),
+               lambda d: d["parties"].append({"id": "C", "name": "Three"}), lambda d: d["parties"][0].update(id="B"),
+               lambda d: d.update(facts=[]), lambda d: d.update(facts=[{"text": 5}]),
+               lambda d: d.update(criterion="ใครนำ"), lambda d: d["parties"][1].update(name="One"),
+               lambda d: d.update(language=7)]
+        for mutate in bad:
+            data = answer_json()
             mutate(data)
             with self.assertRaises(ask_pipeline.Invalid):
-                ask_pipeline.validate_interpretation(data)
-        pool = {"as_of": "x", "candidates": {"A": "a", "B": "b", "none": "n", "C": "c"},
-                "evidence": [{"id": "E1", "source": "S1", "text": "t"}, {"id": "E2", "source": "S1", "text": "t"}]}
-        with self.assertRaises(ask_pipeline.Invalid):
-            ask_pipeline.validate_pool_shape(pool, {"S1"})  # extra candidate
-        del pool["candidates"]["C"]
-        pool["evidence"][0]["source"] = "S9"
-        with self.assertRaises(ask_pipeline.Invalid):
-            ask_pipeline.validate_pool_shape(pool, {"S1"})  # unknown source id
+                ask_pipeline.validate_answer(data)
 
+    async def test_invalid_answer_is_repaired_once_with_the_error_in_the_prompt(self):
+        prompts = []
 
-class LimitTests(unittest.TestCase):
-    def pool(self, cand="The sources show One ahead of Two.", evidence_words=10):
-        text = " ".join(f"w{i}" for i in range(evidence_words))
-        return {"as_of": "now", "candidates": {"A": cand, "B": "The sources show Two ahead of One.", "none": "No clear leader."},
-                "evidence": [{"id": "E1", "source": "S1", "text": text}, {"id": "E2", "source": "S1", "text": text}]}
+        def handler(request):
+            prompts.append(json.loads(request.content)["messages"][1]["content"])
+            return httpx.Response(200, json=or_response(answer_json(parties=[]) if len(prompts) == 1 else answer_json()))
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k"}, httpx.MockTransport(handler))
+        answer, _ = await ask_pipeline.ask_llm(llm, "u", {})
+        self.assertEqual(len(prompts), 2)
+        self.assertIn("exactly 2 parties", prompts[1])
+        self.assertEqual(answer["parties"][1]["name"], "Two")
 
-    def test_candidate_over_48_tokens_is_rejected_for_repair(self):
-        with self.assertRaises(ask_pipeline.Invalid) as ctx:
-            ask_pipeline.fit_pool(self.pool(cand=" ".join(["word"] * 60)), "Who leads?", FakeAgent())
-        self.assertIn("48", str(ctx.exception))
-
-    def test_option_at_the_limit_is_accepted(self):
-        ask_pipeline.fit_pool(self.pool(cand=" ".join(["w"] * 45)), "Who leads?", FakeAgent())  # "\n- A:" adds 2 words
-
-    def test_overlong_evidence_is_trimmed_not_rejected(self):
-        agent = FakeAgent(max_len=150)
-        fitted = ask_pipeline.fit_pool(self.pool(evidence_words=400), "Who leads?", agent)
-        self.assertTrue(fitted["trimmed"])
-        from decision_core import tokenize_state
-        self.assertLessEqual(len(tokenize_state(agent.tok, fitted["state"])) + 40, 150)
-        self.assertTrue(all(e["text"] for e in fitted["evidence"]))
-
-    def test_evidence_budget_of_600_tokens(self):
-        fitted = ask_pipeline.fit_pool(self.pool(evidence_words=500), "Q?", FakeAgent(max_len=5000))
-        self.assertLessEqual(sum(len(e["text"].split()) for e in fitted["evidence"]), 600)
-
-    def test_hopeless_context_is_a_clean_error(self):
+    async def test_non_json_is_repaired_and_second_failure_is_a_clean_error(self):
+        texts = iter(["not json", json.dumps(answer_json())])
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k"}, httpx.MockTransport(
+            lambda r: httpx.Response(200, json=or_response(next(texts)))))
+        answer, _ = await ask_pipeline.ask_llm(llm, "u", {})
+        self.assertEqual(answer["language"], "en")
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k"}, httpx.MockTransport(
+            lambda r: httpx.Response(200, json=or_response({"language": "en"}))))
         with self.assertRaises(ask_pipeline.StageError) as ctx:
-            ask_pipeline.fit_pool(self.pool(), "Who leads?", FakeAgent(max_len=30))
+            await ask_pipeline.ask_llm(llm, "u", {})
+        self.assertEqual(ctx.exception.code, "invalid_llm_output")
+
+
+class PoolTests(unittest.TestCase):
+    def answer(self, **over):
+        return ask_pipeline.validate_answer(answer_json(**over))
+
+    def test_pool_format_is_exactly_the_measured_one(self):
+        pool = ask_pipeline.build_pool(self.answer(), FakeAgent())
+        self.assertEqual(pool["state"], "Findings: One leads by two points. Two is close behind.")
+        self.assertEqual(pool["instructions"], "Which candidate is ahead in the latest polls?")
+        self.assertEqual(pool["candidates"], {"A": "One", "B": "Two", "none": "No clear leader"})
+        self.assertEqual(pool["claims"]["A"], "One is ahead in the latest polls")
+        payload = ask_pipeline.make_payload(pool, {"A": "B", "B": "A", "none": "none"})
+        self.assertEqual(payload["questions"]["vote"]["criteria"], {"A": "Two", "B": "One", "none": "No clear leader"})
+        self.assertIsInstance(payload["state"], str)
+
+    def test_state_is_capped_at_400_chars_on_a_word_boundary(self):
+        facts = [{"text": " ".join(f"word{i}x{j}" for j in range(22)), "source_title": "", "source_url": ""} for i in range(3)]
+        pool = ask_pipeline.build_pool(self.answer(facts=facts), FakeAgent(max_len=2000))
+        self.assertLessEqual(len(pool["state"]), 400)
+        self.assertTrue(pool["trimmed"])
+        self.assertRegex(pool["state"], r"word\d+x\d+$")  # not cut mid-word
+
+    def test_option_over_48_tokens_is_shortened_not_rejected(self):
+        name = " ".join(f"w{i}" for i in range(60))
+        pool = ask_pipeline.build_pool({**self.answer(), "parties": [{"id": "A", "name": name, "aliases": []},
+                                                                       {"id": "B", "name": "Two", "aliases": []}]}, FakeAgent())
+        self.assertLessEqual(len(("\n- A: " + pool["candidates"]["A"]).split()), 48)
+
+    def test_state_is_trimmed_to_the_context_and_hopeless_context_errors(self):
+        agent = FakeAgent(max_len=40, head_max_len=30)
+        pool = ask_pipeline.build_pool(self.answer(), agent)
+        from decision_core import tokenize_state
+        self.assertLess(len(tokenize_state(agent.tok, pool["state"])), 40)
+        with self.assertRaises(ask_pipeline.StageError) as ctx:
+            ask_pipeline.build_pool(self.answer(), FakeAgent(max_len=15, head_max_len=30))
         self.assertEqual(ctx.exception.code, "context_too_long")
 
     def test_real_tokenizer_enforces_the_48_token_option_limit(self):
-        from decision_core import load_tokenizer
+        from decision_core import load_tokenizer, encode
         try:
             tok = load_tokenizer(str(ROOT / "vendor" / "onfly"))
-        except Exception as exc:  # tokenizer stack not installed
+        except Exception as exc:
             self.skipTest(f"real tokenizer unavailable: {exc}")
         agent = FakeAgent(max_len=1024, head_max_len=256)
         agent.tok = tok
-        ask_pipeline.fit_pool(self.pool(), "Who leads?", agent)
-        with self.assertRaises(ask_pipeline.Invalid):
-            ask_pipeline.fit_pool(self.pool(cand="The sources show One ahead of Two. " * 30), "Who leads?", agent)
+        long_name = "The Very Long Party Name Of The Democratic Peoples Republican Alliance " * 3
+        pool = ask_pipeline.build_pool({**self.answer(), "parties": [{"id": "A", "name": long_name.strip()[:60], "aliases": []},
+                                                                       {"id": "B", "name": "Two", "aliases": []}]}, agent)
+        self.assertLessEqual(len(encode(tok, "\n- A: " + pool["candidates"]["A"])), 48)
 
 
 def final_of(events):
@@ -292,7 +337,7 @@ def final_of(events):
 
 class DecisionTests(TmpCacheCase):
     def test_same_candidate_in_both_orders_wins_with_swap_mapped_back(self):
-        events = collect(runtime=FakeRuntime(prefer=("text", "People's Party ahead")), cache=self.cache)
+        events = collect(runtime=FakeRuntime(prefer=("text", "People's Party")), cache=self.cache)
         final = final_of(events)["data"]
         self.assertEqual(final["decision"], "A")
         self.assertTrue(final["consistency"]["agree"])
@@ -303,7 +348,7 @@ class DecisionTests(TmpCacheCase):
         self.assertEqual(final["consistency"]["swapped"]["A"], 0.7)
 
     def test_the_other_candidate_also_wins_symmetrically(self):
-        final = final_of(collect(runtime=FakeRuntime(prefer=("text", "Bhumjaithai ahead")), cache=self.cache))["data"]
+        final = final_of(collect(runtime=FakeRuntime(prefer=("text", "Bhumjaithai")), cache=self.cache))["data"]
         self.assertEqual(final["decision"], "B")
         self.assertEqual(final["candidates"][1]["prob"], 0.7)
 
@@ -323,11 +368,11 @@ class DecisionTests(TmpCacheCase):
         self.assertEqual(final["candidates"][2]["prob"], 0.7)
 
     def test_low_confidence_is_inconclusive_and_threshold_is_configurable(self):
-        low = FakeRuntime(prefer=("text", "People's Party ahead"), top=0.4)
+        low = FakeRuntime(prefer=("text", "People's Party"), top=0.4)
         self.assertEqual(final_of(collect(runtime=low, cache=self.cache))["data"]["decision"], "inconclusive")
         with patch.dict("os.environ", {"JEV_MIN_CONF": "0.35"}):
             self.assertEqual(final_of(collect(runtime=low, cache=self.cache))["data"]["decision"], "A")
-        edge = FakeRuntime(prefer=("text", "People's Party ahead"), top=0.45)
+        edge = FakeRuntime(prefer=("text", "People's Party"), top=0.45)
         self.assertEqual(final_of(collect(runtime=edge, cache=self.cache))["data"]["decision"], "A")  # >= threshold
 
     def test_choice_not_among_the_sent_keys_is_rejected(self):
@@ -415,124 +460,58 @@ class CacheTests(TmpCacheCase):
         self.assertEqual([p.name for p in self.cache.path.parent.iterdir()], ["ask_cache.json"])
 
 
-def gem_text(text):
-    return {"candidates": [{"content": {"parts": [{"text": text}]}}]}
-
-
-class ResearchChainTests(unittest.IsolatedAsyncioTestCase):
-    def make(self, handler, env):
-        llm = llm_layer.LLM(env, httpx.MockTransport(handler))
-        for client in llm.chain:
-            client.backoff = 0
-        return llm
-
-    async def test_gemini_quota_falls_back_to_openrouter_search(self):
-        def handler(request):
-            if request.url.host == "openrouter.ai":
-                return httpx.Response(200, json={"choices": [{"message": {"content": "or notes"}}]})
-            return httpx.Response(429, json={"error": {"status": "RESOURCE_EXHAUSTED"}})
-        llm = self.make(handler, {"GEMINI_API_KEY": "g", "OPENROUTER_API_KEY": "o"})
-        result = await llm.research("s", "u")
-        self.assertEqual((result["provider"], result["grounded"], result["text"]), ("openrouter", True, "or notes"))
-
-    async def test_falls_to_ungrounded_gemini_when_search_unavailable(self):
-        bodies = []
-
-        def handler(request):
-            body = json.loads(request.content)
-            bodies.append(body)
-            return httpx.Response(429) if "tools" in body else httpx.Response(200, json=gem_text("background only"))
-        llm = self.make(handler, {"GEMINI_API_KEY": "g"})
-        result = await llm.research("SYS", "u")
-        last = bodies[-1]
-        self.assertNotIn("tools", last)
-        self.assertNotIn("generationConfig", last)
-        self.assertIn("NO web access", last["systemInstruction"]["parts"][0]["text"])
-        self.assertIn("never invent", last["systemInstruction"]["parts"][0]["text"].lower())
-        self.assertEqual((result["grounded"], result["sources"], result["provider"]), (False, [], "gemini"))
-        self.assertTrue(result["text"].startswith("No live web search was available"))
-        self.assertIn("background only", result["text"])
-
-    async def test_both_search_providers_failing_still_reaches_ungrounded(self):
-        def handler(request):
-            if request.url.host == "openrouter.ai":
-                return httpx.Response(500)
-            return httpx.Response(403) if "tools" in json.loads(request.content) else httpx.Response(200, json=gem_text("n"))
-        llm = self.make(handler, {"GEMINI_API_KEY": "g", "OPENROUTER_API_KEY": "o"})
-        self.assertFalse((await llm.research("s", "u"))["grounded"])
-
-    async def test_transport_error_triggers_next_link(self):
-        def handler(request):
-            if "tools" in json.loads(request.content):
-                raise httpx.ConnectError("boom")
-            return httpx.Response(200, json=gem_text("n"))
-        self.assertFalse((await self.make(handler, {"GEMINI_API_KEY": "g"}).research("s", "u"))["grounded"])
-
-    async def test_parse_error_does_not_trigger_fallback(self):
+class SingleCallPipelineTests(TmpCacheCase):
+    def run_with(self, web_ok, text="who leads?", **runtime_kw):
         calls = []
 
         def handler(request):
-            calls.append(1)
-            return httpx.Response(200, content=b"<html>not json</html>")
-        with self.assertRaises(llm_layer.LLMError) as ctx:
-            await self.make(handler, {"GEMINI_API_KEY": "g"}).research("s", "u")
-        self.assertEqual((ctx.exception.code, len(calls)), ("bad_response", 1))
-
-    async def test_grounded_success_is_flagged_grounded(self):
-        llm = self.make(lambda r: httpx.Response(200, json=gem_text("notes")), {"GEMINI_API_KEY": "g"})
-        result = await llm.research("s", "u")
-        self.assertEqual((result["grounded"], result["provider"]), (True, "gemini"))
-
-
-class GroundingPipelineTests(TmpCacheCase):
-    POOL = {"as_of": "now", "candidates": {"A": "The sources show One ahead of Two.", "B": "The sources show Two ahead of One.",
-                                           "none": "No recent sources are available."},
-            "evidence": [{"id": "E1", "source": "notes", "text": "No recent data."}, {"id": "E2", "source": "notes", "text": "Unclear."}]}
-
-    def run_with(self, search_ok):
-        pool_prompts = []
-
-        def handler(request):
             body = json.loads(request.content)
-            if "tools" in body:
-                if not search_ok:
-                    return httpx.Response(429)
-                return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "grounded notes"}]}, "groundingMetadata": {
-                    "groundingChunks": [{"web": {"uri": "https://s.example/1", "title": "S"}}]}}]})
-            if "generationConfig" not in body:
-                return httpx.Response(200, json=gem_text("background"))
-            system = body["systemInstruction"]["parts"][0]["text"]
-            if "prepare input" in system:
-                pool_prompts.append(body["contents"][0]["parts"][0]["text"])
-                pool = json.loads(json.dumps(self.POOL))
-                pool["evidence"][0]["source"] = "S1" if search_ok else "notes"
-                pool["evidence"][1]["source"] = "S1" if search_ok else "notes"
-                return httpx.Response(200, json=gem_text(json.dumps(pool)))
-            return httpx.Response(200, json=gem_text(json.dumps(dict(VALID_INTERP, language="en"))))
-        llm = llm_layer.LLM({"GEMINI_API_KEY": "g"}, httpx.MockTransport(handler))
-        llm.chain[0].backoff = 0
-        events = collect("who leads?", runtime=FakeRuntime(prefer=("text", "One ahead")), llm=llm, cache=self.cache)
-        return events, pool_prompts
+            calls.append(body)
+            if "plugins" in body and not web_ok:
+                return httpx.Response(402)
+            return httpx.Response(200, json=or_response(answer_json(), CITE if "plugins" in body else []))
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k", "OPENROUTER_MODEL": "vendor/model"}, httpx.MockTransport(handler))
+        llm.client.backoff = 0
+        events = collect(text, runtime=FakeRuntime(prefer=("text", "One"), **runtime_kw), llm=llm, cache=self.cache)
+        return events, calls
 
-    def test_ungrounded_run_is_reported_and_suffixed(self):
-        events, prompts = self.run_with(False)
+    def test_one_llm_call_and_event_order_with_merged_research(self):
+        events, calls = self.run_with(True)
+        self.assertEqual(len(calls), 1)
+        self.assertEqual([(e["stage"], e["status"]) for e in events],
+                         [(s, st) for s in ask_pipeline.STAGES for st in ("start", "done")] + [("final", "done")])
+        done = {e["stage"]: e for e in events if e["status"] == "done"}
+        self.assertEqual(done["research"]["ms"], 0)
+        self.assertEqual(done["research"]["data"]["merged_with"], "interpret")
+        self.assertEqual(done["research"]["data"]["facts"][0]["text"], "One leads by two points.")
+        self.assertEqual(done["research"]["data"]["sources"][0]["url"], "https://c.example/p")
+        self.assertEqual(done["interpret"]["data"]["criterion"], "is ahead in the latest polls")
+        self.assertIn("state", done["pool"]["data"])
+        final = events[-1]["data"]
+        self.assertEqual(final["decision"], "A")
+        self.assertEqual(final["research"], {"grounded": True, "provider": "vendor/model"})
+        self.assertEqual(final["interpretation"]["question_en"], "Which candidate is ahead in the latest polls?")
+        self.assertNotIn("no live web data", final["answer_text"])
+
+    def test_no_web_fallback_is_reported_and_suffixed(self):
+        events, calls = self.run_with(False)
+        self.assertEqual(len(calls), 2)
+        self.assertNotIn("plugins", calls[1])
         final = final_of(events)["data"]
         research = next(e for e in events if e["stage"] == "research" and e["status"] == "done")["data"]
-        self.assertEqual((research["grounded"], research["sources"], research["provider"]), (False, [], "gemini"))
-        self.assertEqual(final["research"], {"grounded": False, "provider": "gemini"})
+        self.assertEqual((research["grounded"], research["sources"]), (False, []))
+        self.assertIn("No live web search", research["notice"])
+        self.assertEqual(final["research"]["grounded"], False)
         self.assertEqual(final["sources"], [])
         self.assertTrue(final["answer_text"].endswith(" (no live web data)"))
-        self.assertIn("NO (general knowledge only)", prompts[0])
-        self.assertIn("No live web search was available", prompts[0])
-        self.assertIn("decision", final)
 
-    def test_grounded_run_has_no_suffix(self):
-        events, prompts = self.run_with(True)
-        final = final_of(events)["data"]
-        self.assertEqual(final["research"], {"grounded": True, "provider": "gemini"})
-        self.assertNotIn("no live web data", final["answer_text"])
-        self.assertIn("live web search: yes", prompts[0])
-        self.assertEqual(len(final["sources"]), 1)
+    def test_both_calls_failing_without_cache_is_a_clean_error_and_with_cache_serves_it(self):
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k"}, httpx.MockTransport(lambda r: httpx.Response(402)))
+        events = collect("q", runtime=FakeRuntime(), llm=llm, cache=self.cache)
+        self.assertEqual((events[-2]["stage"], events[-2]["status"], events[-1]["error"]["code"]), ("interpret", "error", "http_402"))
+        self.run_with(True, text="q2")
+        events = collect("q2", runtime=FakeRuntime(), llm=llm, cache=self.cache)
+        self.assertTrue(events[-1]["data"]["from_cache"])
 
     def test_thai_suffix(self):
         self.assertTrue(ask_pipeline.answer_text("th", "A", "X", {"A": 0.6, "B": 0.3, "none": 0.1}, None, False).endswith("(ไม่มีข้อมูลค้นเว็บสด)"))
@@ -624,7 +603,7 @@ class RouteTests(TmpCacheCase):
         self.assertEqual(events[-1]["error"]["code"], "model_not_ready")
 
     def test_health_has_booleans_and_no_key_text(self):
-        keys = {"GEMINI_API_KEY": "AIza-SECRET-gemini-123", "OPENROUTER_API_KEY": "sk-or-SECRET-456", "PAXA_API_KEY": "paxa-SECRET-789"}
+        keys = {"OPENROUTER_API_KEY": "sk-or-SECRET-456", "PAXA_API_KEY": "paxa-SECRET-789"}
         with patch.dict("os.environ", keys):
             response = self.client.get("/api/ask/health")
         self.assertEqual(response.status_code, 200)
@@ -633,7 +612,8 @@ class RouteTests(TmpCacheCase):
         self.assertNotIn("SECRET", response.text)
         body = response.json()
         self.assertTrue(all(isinstance(v, (bool, int)) for v in body.values()))
-        self.assertTrue(body["gemini"] and body["openrouter"] and body["stt"])
+        self.assertTrue(body["openrouter"] and body["stt"])
+        self.assertNotIn("gemini", body)
 
     def test_fly_page_404_until_built(self):
         with patch.object(app_module, "ROOT", Path(self.tmp.name)):

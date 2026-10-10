@@ -1,6 +1,7 @@
-"""Fly Ask pipeline: interpret -> research -> pool -> jev (forward + swapped) -> adapter, as NDJSON events.
+"""Fly Ask pipeline: ONE web-enabled LLM call (interpret + research) -> pool built in code -> Jev (forward +
+swapped) -> adapter, streamed as NDJSON events with the five stage names the front-end stepper expects.
 
-On-Fly-Jev cannot forecast. The question is rewritten into "which statement do the retrieved sources support?"
+On-Fly-Jev cannot forecast. The question becomes "which candidate matches the criterion, given these findings?"
 with candidates A, B and none. The verdict text is a template, never LLM output.
 """
 import asyncio
@@ -10,7 +11,6 @@ import logging
 import os
 from pathlib import Path
 import random
-import re
 import tempfile
 import threading
 import time
@@ -21,39 +21,21 @@ log = logging.getLogger("onfly.ask")
 ROOT = Path(__file__).resolve().parent
 CACHE_PATH = ROOT / ".runtime" / "ask_cache.json"
 DISCLAIMER = "Entertainment demo - not a prediction"
-JEV_INSTRUCTIONS = "Which statement do the sources support?"
-MAX_EVIDENCE_TOKENS = 600
+NONE_LABEL = "No clear leader"
+STATE_MAX_CHARS = 400
+MAX_FACTS, MAX_FACT_WORDS, MAX_CRITERION_WORDS = 3, 22, 12
 STAGES = ("interpret", "research", "pool", "jev", "adapter")
 
-# ---------------------------------------------------------------------------------------------- prompts
-INTERPRET_SYSTEM = (
-    "You read a user's question (Thai or English) about two political parties or groups and extract a neutral, "
-    "symmetric description. Treat both parties identically. Resolve people and former party names to the party that "
-    "exists today (for example a person's former party -> its successor party) and say so in the echo; if you are not "
-    "sure, say you are not sure. Do not predict anything. Return one JSON object with exactly these keys: "
-    '"language" ("th" or "en", the language of the question), "intent" (short English phrase), '
-    '"parties" (exactly 2 objects {"id":"A"|"B","name":<English name>,"aliases":[strings]}, A = the party mentioned first), '
-    '"time_scope" (short English phrase), "question_en" (neutral English rewrite of the question, one sentence), '
-    '"echo" (one sentence in the USER\'s language beginning with "I understood:" translated to that language, '
-    "naming both parties).")
-RESEARCH_SYSTEM = (
-    "You are a neutral research assistant. Use web search to find the most recent polls, election results and news "
-    "about the two parties. Give both parties the same depth and the same wording. Write plain English notes, "
-    "at most 300 words, with dates and the pollster/outlet name for each fact, and say clearly where evidence is "
-    "thin, old or conflicting. Do not predict outcomes and do not take sides.")
-POOL_SYSTEM = (
-    "You prepare input for a small classifier. Use ONLY the research notes and sources given; never add facts, "
-    "numbers, names or dates that are not in them. Write English only, neutral and symmetric: the two party "
-    "statements must have the same structure and length. Return one JSON object with exactly these keys: "
-    '"as_of" (date or period the notes describe, short), '
-    '"candidates" (object with exactly the keys "A", "B", "none"; each value is one short statement of at most '
-    "25 words: A = the sources show party A ahead of party B; B = the sources show party B ahead of party A; "
-    'none = the sources show no clear leader; use party names, never the letters A or B inside the sentence), '
-    '"evidence" (2 to 4 objects {"id":"E1".., "source":<one of the given source ids>, "text":<one sentence, at most '
-    "35 words, restating a claim from the notes>}). Claims may only restate the research notes. "
-    "The user message says whether the notes came from live web search. If they did NOT, never invent poll figures; "
-    'write the "none" statement as "no recent sources are available / the situation is unclear" ONLY if the notes say '
-    "they have no recent data, otherwise keep the usual wording.")
+# ---------------------------------------------------------------------------------------------- prompt
+ASK_SYSTEM = (
+    "Neutral analyst. The user asks which of two parties/people leads. Resolve nicknames to the CURRENT party names (use today's date); if a party was dissolved or renamed, use its successor's current name and prefer the most recent findings. "
+    "Search once. Reply with compact JSON only: "
+    '{"echo":"one sentence in the user\'s language starting with the translation of \'I understood:\'",'
+    '"language":"th|en","parties":[{"id":"A","name":"short English name, max 4 words","aliases":[]},{"id":"B",...}],'
+    '"criterion":"verb phrase of max 12 words that completes the sentence \'Which candidate ...?\', '
+    'e.g. is ahead in the latest polls","facts":[{"text":"max 22 English words"}],"as_of":"date or period"}. '
+    "facts: 2-3 short findings from the search that bear on the criterion, equal coverage of both parties, "
+    "no speculation, no numbers you did not read. No URLs. Every field except echo MUST be English (translate).")
 
 # ---------------------------------------------------------------------------------------------- templates
 TEXT = {
@@ -147,98 +129,91 @@ def _english(value, name):
     return value
 
 
-def _keys(obj, expected, name):
-    if not isinstance(obj, dict):
-        raise Invalid(f"{name} must be a JSON object")
-    missing, extra = set(expected) - set(obj), set(obj) - set(expected)
-    if missing or extra:
-        raise Invalid(f"{name} must have exactly the keys {sorted(expected)} (missing {sorted(missing)}, extra {sorted(extra)})")
+def _words(text, limit):
+    words = text.split()
+    return " ".join(words[:limit])
 
 
-def validate_interpretation(raw):
-    _keys(raw, ("language", "intent", "parties", "time_scope", "question_en", "echo"), "interpretation")
+def validate_answer(raw):
+    """Strictly validate the single LLM answer. Unknown top-level keys are dropped, over-long facts are truncated."""
+    if not isinstance(raw, dict):
+        raise Invalid("the answer must be a JSON object")
+    missing = {"echo", "language", "parties", "criterion", "facts", "as_of"} - set(raw)
+    if missing:
+        raise Invalid(f"missing keys {sorted(missing)}")
     language = _str(raw["language"], "language", 8).lower()
     parties = raw["parties"]
     if not isinstance(parties, list) or len(parties) != 2:
         raise Invalid("parties must be a list of exactly 2 parties")
     clean = []
     for want, party in zip(("A", "B"), parties):
-        _keys(party, ("id", "name", "aliases"), "party")
+        if not isinstance(party, dict) or {"id", "name"} - set(party):
+            raise Invalid("each party needs id and name")
         if party["id"] != want:
             raise Invalid(f"parties must be ordered with ids A then B (got {party['id']!r} where {want!r} was expected)")
-        aliases = party["aliases"]
-        if not isinstance(aliases, list) or len(aliases) > 8 or not all(isinstance(a, str) for a in aliases):
-            raise Invalid("aliases must be a list of at most 8 strings")
-        clean.append({"id": want, "name": _str(party["name"], "party name", 80), "aliases": [a.strip()[:80] for a in aliases]})
+        aliases = party.get("aliases", [])
+        if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
+            raise Invalid("aliases must be a list of strings")
+        name = _english(_str(party["name"], "party name", 60), "party name")
+        clean.append({"id": want, "name": name, "aliases": [a.strip()[:80] for a in aliases[:6]]})
     if clean[0]["name"].lower() == clean[1]["name"].lower():
         raise Invalid("the two parties must be different")
-    return {"language": language if language in ("th", "en") else "en",
-            "intent": _str(raw["intent"], "intent", 200), "parties": clean,
-            "time_scope": _str(raw["time_scope"], "time_scope", 120),
-            "question_en": _english(_str(raw["question_en"], "question_en", 400), "question_en"),
+    facts = raw["facts"]
+    if not isinstance(facts, list) or not facts:
+        raise Invalid("facts must be a non-empty list")
+    clean_facts = []
+    for item in facts[:MAX_FACTS]:
+        if not isinstance(item, dict) or not isinstance(item.get("text"), str) or not item["text"].strip():
+            raise Invalid("each fact needs a text string")
+        text = _english(_words(item["text"].strip(), MAX_FACT_WORDS), "fact text")
+        title, url = item.get("source_title", ""), item.get("source_url", "")
+        clean_facts.append({"text": text, "source_title": title.strip()[:200] if isinstance(title, str) else "",
+                            "source_url": url.strip()[:500] if isinstance(url, str) and url.startswith("http") else ""})
+    criterion = _english(_words(_str(raw["criterion"], "criterion", 300), MAX_CRITERION_WORDS).rstrip(" ?.").strip(), "criterion")
+    if not criterion:
+        raise Invalid("criterion must not be empty")
+    return {"language": language if language in ("th", "en") else "en", "parties": clean, "criterion": criterion,
+            "facts": clean_facts, "as_of": _str(raw["as_of"], "as_of", 60, allow_empty=True),
             "echo": _str(raw["echo"], "echo", 500)}
 
 
-def validate_pool_shape(raw, source_ids):
-    _keys(raw, ("as_of", "candidates", "evidence"), "pool")
-    as_of = _english(_str(raw["as_of"], "as_of", 60), "as_of")
-    _keys(raw["candidates"], ("A", "B", "none"), "candidates")
-    cands = {k: _english(_str(raw["candidates"][k], f"candidate {k}", 400), f"candidate {k}") for k in ("A", "B", "none")}
-    evidence = raw["evidence"]
-    if not isinstance(evidence, list) or not 2 <= len(evidence) <= 4:
-        raise Invalid("evidence must be a list of 2 to 4 items")
-    clean = []
-    for i, item in enumerate(evidence, start=1):
-        _keys(item, ("id", "source", "text"), f"evidence[{i}]")
-        if item["source"] not in source_ids:
-            raise Invalid(f"evidence[{i}].source must be one of {sorted(source_ids)}")
-        clean.append({"id": _str(item["id"], "evidence id", 20), "source": item["source"],
-                      "text": _english(_str(item["text"], "evidence text", 1000), "evidence text")})
-    return {"as_of": as_of, "candidates": cands, "evidence": clean}
-
-
 # ---------------------------------------------------------------------------------------------- pool builder
-def _shrink(text):
-    words = text.split()
-    if len(words) <= 1:
-        return None
-    return " ".join(words[:min(len(words) - 1, int(len(words) * 0.8))])
+def cut_words(text, max_chars):
+    text = " ".join(text.split())
+    if len(text) <= max_chars:
+        return text
+    cut = text[:max_chars]
+    return cut.rsplit(" ", 1)[0] if " " in cut else cut
 
 
-def fit_pool(pool, question_en, agent):
-    """Enforce Jev limits with the real tokenizer. Candidates too long -> Invalid (repairable).
-    Evidence too long -> trimmed. Returns pool with `state` and `trimmed`."""
+def build_pool(answer, agent):
+    """Deterministic, no LLM: state = one short plain string, candidates = short names + a constant `none`.
+    Limits are checked with the real tokenizer; the findings are cut (never failed) until the state fits."""
     from decision_core import OPT_MAX_TOKENS, encode, to_internal, tokenize_question, tokenize_state
     tok = agent.tok
-    for key, text in pool["candidates"].items():
-        for slot in (("A", "B") if key in ("A", "B") else ("none",)):
-            n = len(encode(tok, "\n- " + f"{slot}: {text}"))
-            if n > OPT_MAX_TOKENS:
-                raise Invalid(f"candidate {key} is {n} tokens; each candidate must be at most {OPT_MAX_TOKENS} tokens "
-                              "(shorten it)")
-    probe = {"type": "choice", "instructions": JEV_INSTRUCTIONS, "criteria": dict(pool["candidates"])}
-    qt = tokenize_question(tok, to_internal(probe))
+    names = {p["id"]: p["name"] for p in answer["parties"]}
+    for key, name in names.items():
+        for slot in ("A", "B"):
+            while len(encode(tok, "\n- " + f"{slot}: {name}")) > OPT_MAX_TOKENS and " " in name:
+                name = name.rsplit(" ", 1)[0]
+            names[key] = name
+    candidates = {"A": names["A"], "B": names["B"], "none": NONE_LABEL}
+    question = {"type": "choice", "instructions": f"Which candidate {answer['criterion']}?", "criteria": dict(candidates)}
+    qt = tokenize_question(tok, to_internal(question))
     head = len(qt["head"]) + sum(map(len, qt["opts"]))
     if head > agent.head_max_len:
-        raise Invalid(f"question and options use {head} tokens; the limit is {agent.head_max_len} (shorten the candidates)")
-    evidence = [dict(e) for e in pool["evidence"]]
-    trimmed = False
-
-    def state():
-        return {"question": question_en, "as_of": pool["as_of"],
-                "evidence": [{"id": e["id"], "source": e["source"], "text": e["text"]} for e in evidence]}
-
-    def over():
-        total = sum(len(encode(tok, e["text"])) for e in evidence)
-        return total > MAX_EVIDENCE_TOKENS or len(tokenize_state(tok, state())) + head + 1 > agent.max_len
-
-    while over():
-        longest = max(evidence, key=lambda e: len(encode(tok, e["text"])))
-        shorter = _shrink(longest["text"])
-        if shorter is None:
-            raise StageError("context_too_long", f"The evidence cannot be made to fit the model's {agent.max_len}-token context.")
-        longest["text"], trimmed = shorter, True
-    return {**pool, "evidence": evidence, "state": state(), "trimmed": trimmed}
+        raise StageError("context_too_long", f"The question and options use {head} tokens; the limit is {agent.head_max_len}.")
+    findings = " ".join(f["text"] for f in answer["facts"])
+    limit = STATE_MAX_CHARS
+    while True:
+        state = "Findings: " + cut_words(findings, limit - len("Findings: "))
+        if len(tokenize_state(tok, state)) + head + 1 <= agent.max_len:
+            return {"state": state, "instructions": question["instructions"], "candidates": candidates,
+                    "claims": {k: (f"{v} {answer['criterion']}" if k != "none" else NONE_LABEL) for k, v in candidates.items()},
+                    "trimmed": len(state) < len("Findings: " + findings)}
+        if limit <= 30:
+            raise StageError("context_too_long", f"The findings cannot be made to fit the model's {agent.max_len}-token context.")
+        limit = int(limit * 0.8)
 
 
 # ---------------------------------------------------------------------------------------------- jev + adapter
@@ -252,7 +227,7 @@ def key_maps(text):
 
 def make_payload(pool, keymap):
     return {"state": pool["state"], "questions": {"vote": {
-        "type": "choice", "instructions": JEV_INSTRUCTIONS,
+        "type": "choice", "instructions": pool["instructions"],
         "criteria": {key: pool["candidates"][keymap[key]] for key in ("A", "B", "none")}}}}
 
 
@@ -306,25 +281,25 @@ def answer_text(language, decision, label, mean, reason, grounded=True):
 
 
 # ---------------------------------------------------------------------------------------------- LLM helper
-async def llm_json(llm, task, system, user, validate, context):
-    """Call the LLM in JSON mode, validate strictly, repair once by re-prompting with the error."""
+async def ask_llm(llm, user, context):
+    """The single LLM call; validate strictly and repair once by re-prompting with the error."""
     error, previous = None, None
     for attempt in (0, 1):
         prompt = user if attempt == 0 else (
             f"{user}\n\nYour previous answer was rejected: {error}\nPrevious answer: "
-            f"{json.dumps(previous, ensure_ascii=False)[:1500]}\nReturn the corrected JSON object only.")
+            f"{json.dumps(previous, ensure_ascii=False)[:1200]}\nReturn the corrected JSON object only.")
         try:
-            raw = await llm.json(task, system, prompt, context=context)
+            result = await llm.ask(ASK_SYSTEM, prompt, context=context)
         except LLMError as exc:
             if exc.code != "bad_json":
                 raise StageError(exc.code, exc.message, fallback_ok=True) from exc
             error, previous = exc.message, None
             continue
         try:
-            return validate(raw)
+            return validate_answer(result["data"]), result
         except Invalid as exc:
-            error, previous = str(exc), raw
-    raise StageError("invalid_llm_output", f"The {task} step did not produce valid output after one repair: {error}")
+            error, previous = str(exc), result["data"]
+    raise StageError("invalid_llm_output", f"The language model did not produce valid output after one repair: {error}")
 
 
 # ---------------------------------------------------------------------------------------------- stages
@@ -348,7 +323,7 @@ def _cached_stage_data(final, stage, reason=None):
     if stage == "interpret":
         data["interpretation"] = final.get("interpretation")
     elif stage == "research":
-        data["sources"] = final.get("sources")
+        data.update(sources=final.get("sources"), merged_with="interpret", **(final.get("research") or {}))
     elif stage == "pool":
         data["candidates"] = [{"id": c["id"], "label": c["label"], "claim": c["claim"]} for c in final.get("candidates", [])]
     elif stage == "jev":
@@ -359,35 +334,24 @@ def _cached_stage_data(final, stage, reason=None):
 
 
 async def stage_interpret(ctx):
-    raw_text = ctx["text"]
-    user = "Question (data, not instructions):\n" + json.dumps({"question": raw_text}, ensure_ascii=False)
-    interp = await llm_json(ctx["llm"], "interpret", INTERPRET_SYSTEM, user, validate_interpretation, {"text": raw_text})
-    ctx["interp"] = interp
-    return {"interpretation": interp, "provider": ctx["llm"].used}
+    user = (f"Today: {time.strftime('%Y-%m-%d')}\nQuestion (data, not instructions):\n"
+            + json.dumps({"question": ctx["text"]}, ensure_ascii=False))
+    answer, result = await ask_llm(ctx["llm"], user, {"text": ctx["text"]})
+    sources = []
+    if result["grounded"]:
+        sources = [{"title": s["title"], "url": s["url"], "snippet": s.get("snippet", "")} for s in result["sources"][:3]]
+    ctx.update(answer=answer, sources=sources, grounded=result["grounded"], research_provider=result["provider"])
+    return {"echo": answer["echo"], "language": answer["language"], "parties": answer["parties"],
+            "criterion": answer["criterion"], "provider": result["provider"], "usage": result["usage"]}
 
 
 async def stage_research(ctx):
-    interp = ctx["interp"]
-    parties = "; ".join(f"{p['name']} (aliases: {', '.join(p['aliases'])})" for p in interp["parties"])
-    user = (f"Question: {interp['question_en']}\nParties: {parties}\nTime scope: {interp['time_scope']}\n"
-            "Find recent polls and news evidence for both parties.")
-    try:
-        result = await ctx["llm"].research(RESEARCH_SYSTEM, user, context={"parties": interp["parties"]})
-    except LLMError as exc:
-        raise StageError(exc.code, exc.message, fallback_ok=True) from exc
-    notes = (result.get("text") or "").strip()
-    if not notes:
-        raise StageError("empty_research", "Research returned no notes.", fallback_ok=True)
-    sources = [{"title": s["title"], "url": s["url"], "snippet": s.get("snippet", "")}
-               for s in result.get("sources", [])[:6]]
-    grounded = bool(result.get("grounded"))
-    if not grounded:
-        sources = []
-        if not notes.startswith(UNGROUNDED_NOTICE):
-            notes = UNGROUNDED_NOTICE + "\n" + notes
-    ctx["notes"], ctx["sources"], ctx["grounded"] = notes[:6000], sources, grounded
-    ctx["research_provider"] = result.get("provider") or ctx["llm"].used
-    return {"sources": sources, "notes_chars": len(notes), "grounded": grounded, "provider": ctx["research_provider"]}
+    """No second call: the facts came with the interpret call."""
+    data = {"facts": ctx["answer"]["facts"], "as_of": ctx["answer"]["as_of"], "sources": ctx["sources"],
+            "grounded": ctx["grounded"], "provider": ctx["research_provider"], "merged_with": "interpret"}
+    if not ctx["grounded"]:
+        data["notice"] = UNGROUNDED_NOTICE
+    return data
 
 
 async def stage_pool(ctx):
@@ -396,18 +360,10 @@ async def stage_pool(ctx):
     if agent is None or getattr(runtime, "status", "ready") != "ready":
         raise StageError("model_not_ready", getattr(runtime, "error", None) or "The model is still loading. Try again shortly.",
                          fallback_ok=True)
-    interp, sources = ctx["interp"], ctx["sources"]
-    ids = {f"S{i}" for i in range(1, len(sources) + 1)} or {"notes"}
-    listing = "\n".join(f"S{i}: {s['title']} - {s['snippet']}" for i, s in enumerate(sources, start=1)) or "notes: (research notes only)"
-    user = (f"Question: {interp['question_en']}\nParty A: {interp['parties'][0]['name']}\nParty B: {interp['parties'][1]['name']}\n"
-            f"Research grounded in live web search: {'yes' if ctx['grounded'] else 'NO (general knowledge only)'}\n"
-            f"Sources:\n{listing}\n\nResearch notes:\n{ctx['notes']}")
-    pool = await llm_json(ctx["llm"], "pool", POOL_SYSTEM, user,
-                          lambda raw: fit_pool(validate_pool_shape(raw, ids), interp["question_en"], agent),
-                          {"parties": interp["parties"], "source_ids": sorted(ids)})
-    ctx["pool"] = pool
-    return {"candidates": pool["candidates"], "evidence": pool["evidence"], "as_of": pool["as_of"],
-            "evidence_trimmed": pool["trimmed"], "provider": ctx["llm"].used}
+    ctx["pool"] = build_pool(ctx["answer"], agent)
+    pool = ctx["pool"]
+    return {"state": pool["state"], "instructions": pool["instructions"], "candidates": pool["candidates"],
+            "state_trimmed": pool["trimmed"]}
 
 
 async def _predict(runtime, payload):
@@ -439,19 +395,20 @@ async def stage_jev(ctx):
 
 async def stage_adapter(ctx):
     verdict = adapt(ctx["runs"][0], ctx["runs"][1], min_conf())
-    interp = ctx["interp"]
-    labels = {p["id"]: p["name"] for p in interp["parties"]}
-    labels["none"] = TEXT.get(interp["language"], TEXT["en"])["none_label"]
-    claims = ctx["pool"]["candidates"]
+    answer = ctx["answer"]
+    labels = {p["id"]: p["name"] for p in answer["parties"]}
+    labels["none"] = TEXT.get(answer["language"], TEXT["en"])["none_label"]
     decision = verdict["decision"]
     ctx["final"] = {
         "decision": decision,
-        "candidates": [{"id": i, "label": labels[i], "claim": claims[i], "prob": verdict["mean"][i]} for i in ("A", "B", "none")],
-        "interpretation": {"echo": interp["echo"], "language": interp["language"], "question_en": interp["question_en"]},
+        "candidates": [{"id": i, "label": labels[i], "claim": ctx["pool"]["claims"][i], "prob": verdict["mean"][i]}
+                       for i in ("A", "B", "none")],
+        "interpretation": {"echo": answer["echo"], "language": answer["language"],
+                           "question_en": ctx["pool"]["instructions"]},
         "sources": ctx["sources"],
         "consistency": {"agree": verdict["agree"], "forward": verdict["forward"], "swapped": verdict["swapped"]},
-        "jev": {"inference_ms": ctx["inference_ms"], "provider": ctx["llm"].used},
-        "answer_text": answer_text(interp["language"], decision, labels.get(decision), verdict["mean"], verdict["reason"],
+        "jev": {"inference_ms": ctx["inference_ms"], "provider": ctx["research_provider"]},
+        "answer_text": answer_text(answer["language"], decision, labels.get(decision), verdict["mean"], verdict["reason"],
                                    ctx["grounded"]),
         "research": {"grounded": ctx["grounded"], "provider": ctx["research_provider"]},
         "disclaimer": DISCLAIMER, "from_cache": False}
@@ -505,3 +462,4 @@ async def run_ask(text, *, runtime, llm, replay=False, cache=None):
     except OSError:
         log.warning("Could not write the ask cache")
     yield {"stage": "final", "status": "done", "data": ctx["final"]}
+

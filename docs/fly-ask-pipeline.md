@@ -3,6 +3,19 @@
 Hackathon feature on top of the existing Fly Decision Lab (`app.py`, `project_store.py`, `scrapers.py`, `web/`).
 Demo question (Thai, neutral wording): "ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?"
 
+
+> **REVISION (OpenRouter only, one LLM call) - supersedes the pipeline/config text below where they differ.**
+> - Gemini is removed. `LLM_PROVIDER` is `openrouter` (default) or `fake`. Default model `deepseek/deepseek-v4.1-flash`
+>   (`OPENROUTER_MODEL` overrides; reasoning disabled, temperature 0, `max_tokens` capped).
+> - ONE OpenRouter call with the web plugin (`max_results: 2`) does interpret + search + 2-3 short facts. If that call
+>   fails (402/429/5xx/timeout) it is retried once without web (`research.grounded=false`).
+> - The candidate pool is built in CODE: `state` = one short text `Findings: ...` (<= ~400 chars), candidates `A`/`B` =
+>   short party names, `none` = "No clear leader", question "Which candidate <criterion>?". Jev runs twice (A/B swapped).
+> - Stage events keep the five names for the UI: `interpret` (the one call), `research` (ms 0, `merged_with: interpret`),
+>   `pool` (code), `jev`, `adapter`. Measured live: ~5-6 s end to end, ~$0.007 per fresh question, ~2.6k prompt tokens.
+> - Jev stays the real decision maker. Search results change between runs, so a fresh run can differ (even be
+>   `inconclusive`): use the cache (`replay`) for the rehearsed demo questions.
+
 ## Honest framing (keep it light, but keep it)
 On-Fly-Jev cannot forecast. The pipeline REWRITES the question into: "which statement do the retrieved sources
 support?" with candidates `A`, `B` and `none` ("sources show no clear leader"). The UI shows one small line:
