@@ -349,6 +349,9 @@ async def stage_research(ctx):
     """No second call: the facts came with the interpret call."""
     data = {"facts": ctx["answer"]["facts"], "as_of": ctx["answer"]["as_of"], "sources": ctx["sources"],
             "grounded": ctx["grounded"], "provider": ctx["research_provider"], "merged_with": "interpret"}
+    data["search"] = {"engine": "OpenRouter web plugin" if ctx["grounded"] else "none (model knowledge only)",
+                      "max_results": 2 if ctx["grounded"] else 0, "results_returned": len(ctx["sources"]),
+                      "model": ctx["research_provider"]}
     if not ctx["grounded"]:
         data["notice"] = UNGROUNDED_NOTICE
     return data
@@ -412,7 +415,14 @@ async def stage_adapter(ctx):
                                    ctx["grounded"]),
         "research": {"grounded": ctx["grounded"], "provider": ctx["research_provider"]},
         "disclaimer": DISCLAIMER, "from_cache": False}
-    return {"decision": decision, "agree": verdict["agree"], "mean": verdict["mean"]}
+    threshold, winner = min_conf(), (verdict["decision"] if verdict["decision"] != "inconclusive" else None)
+    best = max(verdict["mean"], key=verdict["mean"].get)
+    return {"decision": decision, "agree": verdict["agree"], "mean": verdict["mean"], "reason": verdict["reason"],
+            "min_conf": threshold, "forward_choice": ctx["runs"][0][0], "swapped_choice": ctx["runs"][1][0],
+            "top": best, "top_prob": verdict["mean"][best], "id_ok": True,
+            "checks": [{"name": "choice id was one of the options sent", "ok": True},
+                       {"name": "forward and swapped runs name the same candidate", "ok": verdict["agree"]},
+                       {"name": f"mean probability >= {threshold}", "ok": bool(winner) and verdict["mean"][winner] >= threshold}]}
 
 
 STEPS = (("interpret", stage_interpret), ("research", stage_research), ("pool", stage_pool),

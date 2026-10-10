@@ -475,6 +475,20 @@ class SingleCallPipelineTests(TmpCacheCase):
         events = collect(text, runtime=FakeRuntime(prefer=("text", "One"), **runtime_kw), llm=llm, cache=self.cache)
         return events, calls
 
+    def test_debug_metadata_search_info_and_adapter_checks(self):
+        events, _ = self.run_with(True)
+        done = {e["stage"]: e["data"] for e in events if e["status"] == "done" and e["stage"] != "final"}
+        self.assertEqual(done["research"]["search"]["engine"], "OpenRouter web plugin")
+        self.assertEqual(done["research"]["search"]["max_results"], 2)
+        self.assertEqual(done["research"]["search"]["results_returned"], len(done["research"]["sources"]))
+        adapter = done["adapter"]
+        self.assertEqual(adapter["min_conf"], ask_pipeline.min_conf())
+        self.assertEqual([c["ok"] for c in adapter["checks"]][:2], [True, adapter["agree"]])
+        self.assertEqual(adapter["top"], max(adapter["mean"], key=adapter["mean"].get))
+        events, _ = self.run_with(False)
+        search = [e for e in events if e["stage"] == "research" and e["status"] == "done"][0]["data"]["search"]
+        self.assertEqual((search["max_results"], search["results_returned"]), (0, 0))
+
     def test_one_llm_call_and_event_order_with_merged_research(self):
         events, calls = self.run_with(True)
         self.assertEqual(len(calls), 1)
