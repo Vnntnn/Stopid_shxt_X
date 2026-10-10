@@ -73,6 +73,35 @@ function ndjson(lines) {
   });
 }
 
+// A fake "voice": syllable-like buzzy bursts with a wobbling pitch, as a 16-bit mono WAV. Enough to exercise the effects chain.
+function fakeVoiceWav(text) {
+  const rate = 22050;
+  const dur = Math.min(2.6, 0.9 + String(text).length * 0.012);
+  const n = Math.floor(rate * dur);
+  const pcm = new Int16Array(n);
+  let phase = 0;
+  let seed = 1;
+  for (const ch of String(text)) seed = (seed * 31 + ch.charCodeAt(0)) >>> 0;
+  const rnd = () => { seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0; return seed / 4294967296; };
+  for (let i = 0; i < n; i++) {
+    const t = i / rate;
+    const syl = Math.max(0, Math.sin(t * 2 * Math.PI * 4.2));            // ~4 syllables per second
+    const f = 240 + 90 * Math.sin(t * 2 * Math.PI * 1.3) + 40 * Math.sin(t * 17);
+    phase += f / rate;
+    const saw = 2 * (phase % 1) - 1;
+    const v = (saw * 0.6 + (rnd() * 2 - 1) * 0.08) * syl * Math.min(1, t * 20, (dur - t) * 20);
+    pcm[i] = Math.max(-1, Math.min(1, v)) * 0.6 * 32767;
+  }
+  const buf = new ArrayBuffer(44 + n * 2);
+  const dv = new DataView(buf);
+  const w = (o, str) => { for (let i = 0; i < str.length; i++) dv.setUint8(o + i, str.charCodeAt(i)); };
+  w(0, 'RIFF'); dv.setUint32(4, 36 + n * 2, true); w(8, 'WAVE'); w(12, 'fmt '); dv.setUint32(16, 16, true);
+  dv.setUint16(20, 1, true); dv.setUint16(22, 1, true); dv.setUint32(24, rate, true); dv.setUint32(28, rate * 2, true);
+  dv.setUint16(32, 2, true); dv.setUint16(34, 16, true); w(36, 'data'); dv.setUint32(40, n * 2, true);
+  new Int16Array(buf, 44).set(pcm);
+  return buf;
+}
+
 export function installMock(params) {
   const mode = params.get('mock');
   const fail = params.get('fail');
@@ -102,6 +131,17 @@ export function installMock(params) {
       if (replay) fin.from_cache = true;
       L.push([120, { stage: 'final', status: 'done', data: fin }]);
       return new Response(ndjson(L), { headers: { 'Content-Type': 'application/x-ndjson' } });
+    }
+    if (u.endsWith('/api/tts')) {
+      const body = JSON.parse(opts.body || '{}');
+      (window.__mockTts = window.__mockTts || []).push(body.text);
+      await sleep(350);
+      if (params.get('tts') === 'fail') {
+        return new Response(JSON.stringify({ error: 'tts_not_configured', message: 'TTS is not configured (mock)' }), { status: 503, headers: { 'Content-Type': 'application/json' } });
+      }
+      const seen = (window.__mockTtsSeen = window.__mockTtsSeen || new Set());
+      const hit = seen.has(body.text); seen.add(body.text);
+      return new Response(fakeVoiceWav(body.text), { headers: { 'Content-Type': 'audio/wav', 'x-tts-cache': hit ? 'hit' : 'miss' } });
     }
     if (u.endsWith('/api/stt')) {
       await sleep(900);
