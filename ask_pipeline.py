@@ -15,7 +15,7 @@ import tempfile
 import threading
 import time
 
-from llm import LLMError, THAI
+from llm import LLMError, THAI, UNGROUNDED_NOTICE
 
 log = logging.getLogger("onfly.ask")
 ROOT = Path(__file__).resolve().parent
@@ -50,7 +50,10 @@ POOL_SYSTEM = (
     "25 words: A = the sources show party A ahead of party B; B = the sources show party B ahead of party A; "
     'none = the sources show no clear leader; use party names, never the letters A or B inside the sentence), '
     '"evidence" (2 to 4 objects {"id":"E1".., "source":<one of the given source ids>, "text":<one sentence, at most '
-    "35 words, restating a claim from the notes>}). Claims may only restate the research notes.")
+    "35 words, restating a claim from the notes>}). Claims may only restate the research notes. "
+    "The user message says whether the notes came from live web search. If they did NOT, never invent poll figures; "
+    'write the "none" statement as "no recent sources are available / the situation is unclear" ONLY if the notes say '
+    "they have no recent data, otherwise keep the usual wording.")
 
 # ---------------------------------------------------------------------------------------------- templates
 TEXT = {
@@ -60,6 +63,7 @@ TEXT = {
         "B": "แหล่งข้อมูลที่ค้นพบสนับสนุนว่า {label} นำอยู่ (น้ำหนัก {pct}%)",
         "none": "แหล่งข้อมูลที่ค้นพบไม่ชี้ชัดว่าฝ่ายใดนำ (น้ำหนัก {pct}%)",
         "disagree": "ยังสรุปไม่ได้: การตรวจสองลำดับตัวเลือกให้คำตอบไม่ตรงกัน",
+        "ungrounded": " (ไม่มีข้อมูลค้นเว็บสด)",
         "low": "ยังสรุปไม่ได้: ความมั่นใจต่ำกว่าเกณฑ์ ({pct}%)"},
     "en": {
         "none_label": "No clear leader",
@@ -67,6 +71,7 @@ TEXT = {
         "B": "The sources found support {label} being ahead (weight {pct}%)",
         "none": "The sources found show no clear leader (weight {pct}%)",
         "disagree": "Inconclusive: the two option orders gave different answers",
+        "ungrounded": " (no live web data)",
         "low": "Inconclusive: confidence is below the threshold ({pct}%)"}}
 
 
@@ -291,12 +296,13 @@ def adapt(forward, swapped, threshold):
             "forward": {k: round(v, 4) for k, v in f_p.items()}, "swapped": {k: round(v, 4) for k, v in s_p.items()}}
 
 
-def answer_text(language, decision, label, mean, reason):
+def answer_text(language, decision, label, mean, reason, grounded=True):
     t = TEXT.get(language, TEXT["en"])
     if decision == "inconclusive":
-        top = max(mean.values())
-        return t[reason].format(pct=round(top * 100))
-    return t[decision].format(label=label, pct=round(mean[decision] * 100))
+        text = t[reason].format(pct=round(max(mean.values()) * 100))
+    else:
+        text = t[decision].format(label=label, pct=round(mean[decision] * 100))
+    return text if grounded else text + t["ungrounded"]
 
 
 # ---------------------------------------------------------------------------------------------- LLM helper
@@ -374,8 +380,14 @@ async def stage_research(ctx):
         raise StageError("empty_research", "Research returned no notes.", fallback_ok=True)
     sources = [{"title": s["title"], "url": s["url"], "snippet": s.get("snippet", "")}
                for s in result.get("sources", [])[:6]]
-    ctx["notes"], ctx["sources"] = notes[:6000], sources
-    return {"sources": sources, "notes_chars": len(notes), "provider": ctx["llm"].used}
+    grounded = bool(result.get("grounded"))
+    if not grounded:
+        sources = []
+        if not notes.startswith(UNGROUNDED_NOTICE):
+            notes = UNGROUNDED_NOTICE + "\n" + notes
+    ctx["notes"], ctx["sources"], ctx["grounded"] = notes[:6000], sources, grounded
+    ctx["research_provider"] = result.get("provider") or ctx["llm"].used
+    return {"sources": sources, "notes_chars": len(notes), "grounded": grounded, "provider": ctx["research_provider"]}
 
 
 async def stage_pool(ctx):
@@ -388,6 +400,7 @@ async def stage_pool(ctx):
     ids = {f"S{i}" for i in range(1, len(sources) + 1)} or {"notes"}
     listing = "\n".join(f"S{i}: {s['title']} - {s['snippet']}" for i, s in enumerate(sources, start=1)) or "notes: (research notes only)"
     user = (f"Question: {interp['question_en']}\nParty A: {interp['parties'][0]['name']}\nParty B: {interp['parties'][1]['name']}\n"
+            f"Research grounded in live web search: {'yes' if ctx['grounded'] else 'NO (general knowledge only)'}\n"
             f"Sources:\n{listing}\n\nResearch notes:\n{ctx['notes']}")
     pool = await llm_json(ctx["llm"], "pool", POOL_SYSTEM, user,
                           lambda raw: fit_pool(validate_pool_shape(raw, ids), interp["question_en"], agent),
@@ -438,7 +451,9 @@ async def stage_adapter(ctx):
         "sources": ctx["sources"],
         "consistency": {"agree": verdict["agree"], "forward": verdict["forward"], "swapped": verdict["swapped"]},
         "jev": {"inference_ms": ctx["inference_ms"], "provider": ctx["llm"].used},
-        "answer_text": answer_text(interp["language"], decision, labels.get(decision), verdict["mean"], verdict["reason"]),
+        "answer_text": answer_text(interp["language"], decision, labels.get(decision), verdict["mean"], verdict["reason"],
+                                   ctx["grounded"]),
+        "research": {"grounded": ctx["grounded"], "provider": ctx["research_provider"]},
         "disclaimer": DISCLAIMER, "from_cache": False}
     return {"decision": decision, "agree": verdict["agree"], "mean": verdict["mean"]}
 

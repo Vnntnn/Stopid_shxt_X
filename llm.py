@@ -47,6 +47,14 @@ def parse_json_text(text):
         raise LLMError("bad_json", "The model did not return valid JSON.") from exc
 
 
+UNGROUNDED_NOTICE = ("No live web search was available; this summary is from the model's general knowledge "
+                     "and may be out of date.")
+UNGROUNDED_RULES = (
+    "\nIMPORTANT: you have NO web access for this task. Use only well-established background knowledge. State your "
+    "knowledge cut-off and your uncertainty. Never invent numbers, polls, dates or quotes. If you have no recent "
+    "data, say so plainly.")
+
+
 class _HttpBase:
     backoff = 0.6
 
@@ -110,6 +118,12 @@ class GeminiClient(_HttpBase):
         url, headers, body = self._request(system, user, config=config)
         return parse_json_text(self._text(await self._post(url, headers, body, JSON_TIMEOUT)))
 
+    async def research_ungrounded(self, system, user, context=None):
+        """Last-resort research with no tools: honest general-knowledge notes, no sources."""
+        url, headers, body = self._request(system + UNGROUNDED_RULES, user)
+        text = self._text(await self._post(url, headers, body, RESEARCH_TIMEOUT))
+        return {"text": UNGROUNDED_NOTICE + "\n" + text, "sources": [], "grounded": False, "provider": self.name}
+
     async def research(self, system, user, context=None):
         url, headers, body = self._request(system, user, tools=[{"google_search": {}}])
         data = await self._post(url, headers, body, RESEARCH_TIMEOUT)
@@ -123,7 +137,7 @@ class GeminiClient(_HttpBase):
             if isinstance(web, dict) and web.get("uri") and web["uri"] not in seen:
                 seen.add(web["uri"])
                 sources.append({"title": str(web.get("title") or web["uri"]), "url": web["uri"], "snippet": ""})
-        return {"text": self._text(data), "sources": sources}
+        return {"text": self._text(data), "sources": sources, "grounded": True, "provider": self.name}
 
 
 class OpenRouterClient(_HttpBase):
@@ -162,7 +176,7 @@ class OpenRouterClient(_HttpBase):
                 seen.add(cite["url"])
                 sources.append({"title": str(cite.get("title") or cite["url"]), "url": cite["url"],
                                 "snippet": str(cite.get("content") or "")[:240]})
-        return {"text": message["content"], "sources": sources}
+        return {"text": message["content"], "sources": sources, "grounded": True, "provider": self.name}
 
 
 class FakeClient:
@@ -212,7 +226,7 @@ class FakeClient:
         raise LLMError("bad_task", f"Unknown fake task {task!r}.")
 
     async def research(self, system, user, context=None):
-        return {"text": self.NOTES, "sources": [
+        return {"grounded": True, "provider": self.name, "text": self.NOTES, "sources": [
             {"title": "FAKE-DEMO: Illustrative poll roundup (not a real source)", "url": "https://example.com/fake-demo/poll-roundup",
              "snippet": "FAKE-DEMO - canned text, not real data."},
             {"title": "FAKE-DEMO: Illustrative news summary (not a real source)", "url": "https://example.com/fake-demo/news-summary",
@@ -232,7 +246,7 @@ class LLM:
         self.configured = {"gemini": bool(gem), "openrouter": bool(orr), "fake": self.primary == "fake"}
         real = {}
         if gem:
-            real["gemini"] = GeminiClient(gem, env.get("GEMINI_MODEL") or "gemini-2.5-flash", transport)
+            real["gemini"] = GeminiClient(gem, env.get("GEMINI_MODEL") or "gemini-flash-latest", transport)
         if orr:
             real["openrouter"] = OpenRouterClient(orr, env.get("OPENROUTER_MODEL") or "google/gemini-2.5-flash", transport)
         if self.primary == "fake":
@@ -263,4 +277,15 @@ class LLM:
         return await self._call("json", task, system, user, context=context, schema=schema)
 
     async def research(self, system, user, context=None):
-        return await self._call("research", system, user, context=context)
+        """Chain: grounded research on each real provider (next link on quota/permission/transport errors),
+        then Gemini without tools. Parse errors do not trigger the next link."""
+        try:
+            return await self._call("research", system, user, context=context)
+        except LLMError as exc:
+            gemini = next((c for c in self.chain if isinstance(c, GeminiClient)), None)
+            if gemini is None or not _falls_back(exc):
+                raise
+            log.warning("Grounded research unavailable (%s); using Gemini without search", exc.code)
+            result = await gemini.research_ungrounded(system, user, context=context)
+            self.used = gemini.name
+            return result

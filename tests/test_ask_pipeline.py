@@ -415,6 +415,129 @@ class CacheTests(TmpCacheCase):
         self.assertEqual([p.name for p in self.cache.path.parent.iterdir()], ["ask_cache.json"])
 
 
+def gem_text(text):
+    return {"candidates": [{"content": {"parts": [{"text": text}]}}]}
+
+
+class ResearchChainTests(unittest.IsolatedAsyncioTestCase):
+    def make(self, handler, env):
+        llm = llm_layer.LLM(env, httpx.MockTransport(handler))
+        for client in llm.chain:
+            client.backoff = 0
+        return llm
+
+    async def test_gemini_quota_falls_back_to_openrouter_search(self):
+        def handler(request):
+            if request.url.host == "openrouter.ai":
+                return httpx.Response(200, json={"choices": [{"message": {"content": "or notes"}}]})
+            return httpx.Response(429, json={"error": {"status": "RESOURCE_EXHAUSTED"}})
+        llm = self.make(handler, {"GEMINI_API_KEY": "g", "OPENROUTER_API_KEY": "o"})
+        result = await llm.research("s", "u")
+        self.assertEqual((result["provider"], result["grounded"], result["text"]), ("openrouter", True, "or notes"))
+
+    async def test_falls_to_ungrounded_gemini_when_search_unavailable(self):
+        bodies = []
+
+        def handler(request):
+            body = json.loads(request.content)
+            bodies.append(body)
+            return httpx.Response(429) if "tools" in body else httpx.Response(200, json=gem_text("background only"))
+        llm = self.make(handler, {"GEMINI_API_KEY": "g"})
+        result = await llm.research("SYS", "u")
+        last = bodies[-1]
+        self.assertNotIn("tools", last)
+        self.assertNotIn("generationConfig", last)
+        self.assertIn("NO web access", last["systemInstruction"]["parts"][0]["text"])
+        self.assertIn("never invent", last["systemInstruction"]["parts"][0]["text"].lower())
+        self.assertEqual((result["grounded"], result["sources"], result["provider"]), (False, [], "gemini"))
+        self.assertTrue(result["text"].startswith("No live web search was available"))
+        self.assertIn("background only", result["text"])
+
+    async def test_both_search_providers_failing_still_reaches_ungrounded(self):
+        def handler(request):
+            if request.url.host == "openrouter.ai":
+                return httpx.Response(500)
+            return httpx.Response(403) if "tools" in json.loads(request.content) else httpx.Response(200, json=gem_text("n"))
+        llm = self.make(handler, {"GEMINI_API_KEY": "g", "OPENROUTER_API_KEY": "o"})
+        self.assertFalse((await llm.research("s", "u"))["grounded"])
+
+    async def test_transport_error_triggers_next_link(self):
+        def handler(request):
+            if "tools" in json.loads(request.content):
+                raise httpx.ConnectError("boom")
+            return httpx.Response(200, json=gem_text("n"))
+        self.assertFalse((await self.make(handler, {"GEMINI_API_KEY": "g"}).research("s", "u"))["grounded"])
+
+    async def test_parse_error_does_not_trigger_fallback(self):
+        calls = []
+
+        def handler(request):
+            calls.append(1)
+            return httpx.Response(200, content=b"<html>not json</html>")
+        with self.assertRaises(llm_layer.LLMError) as ctx:
+            await self.make(handler, {"GEMINI_API_KEY": "g"}).research("s", "u")
+        self.assertEqual((ctx.exception.code, len(calls)), ("bad_response", 1))
+
+    async def test_grounded_success_is_flagged_grounded(self):
+        llm = self.make(lambda r: httpx.Response(200, json=gem_text("notes")), {"GEMINI_API_KEY": "g"})
+        result = await llm.research("s", "u")
+        self.assertEqual((result["grounded"], result["provider"]), (True, "gemini"))
+
+
+class GroundingPipelineTests(TmpCacheCase):
+    POOL = {"as_of": "now", "candidates": {"A": "The sources show One ahead of Two.", "B": "The sources show Two ahead of One.",
+                                           "none": "No recent sources are available."},
+            "evidence": [{"id": "E1", "source": "notes", "text": "No recent data."}, {"id": "E2", "source": "notes", "text": "Unclear."}]}
+
+    def run_with(self, search_ok):
+        pool_prompts = []
+
+        def handler(request):
+            body = json.loads(request.content)
+            if "tools" in body:
+                if not search_ok:
+                    return httpx.Response(429)
+                return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "grounded notes"}]}, "groundingMetadata": {
+                    "groundingChunks": [{"web": {"uri": "https://s.example/1", "title": "S"}}]}}]})
+            if "generationConfig" not in body:
+                return httpx.Response(200, json=gem_text("background"))
+            system = body["systemInstruction"]["parts"][0]["text"]
+            if "prepare input" in system:
+                pool_prompts.append(body["contents"][0]["parts"][0]["text"])
+                pool = json.loads(json.dumps(self.POOL))
+                pool["evidence"][0]["source"] = "S1" if search_ok else "notes"
+                pool["evidence"][1]["source"] = "S1" if search_ok else "notes"
+                return httpx.Response(200, json=gem_text(json.dumps(pool)))
+            return httpx.Response(200, json=gem_text(json.dumps(dict(VALID_INTERP, language="en"))))
+        llm = llm_layer.LLM({"GEMINI_API_KEY": "g"}, httpx.MockTransport(handler))
+        llm.chain[0].backoff = 0
+        events = collect("who leads?", runtime=FakeRuntime(prefer=("text", "One ahead")), llm=llm, cache=self.cache)
+        return events, pool_prompts
+
+    def test_ungrounded_run_is_reported_and_suffixed(self):
+        events, prompts = self.run_with(False)
+        final = final_of(events)["data"]
+        research = next(e for e in events if e["stage"] == "research" and e["status"] == "done")["data"]
+        self.assertEqual((research["grounded"], research["sources"], research["provider"]), (False, [], "gemini"))
+        self.assertEqual(final["research"], {"grounded": False, "provider": "gemini"})
+        self.assertEqual(final["sources"], [])
+        self.assertTrue(final["answer_text"].endswith(" (no live web data)"))
+        self.assertIn("NO (general knowledge only)", prompts[0])
+        self.assertIn("No live web search was available", prompts[0])
+        self.assertIn("decision", final)
+
+    def test_grounded_run_has_no_suffix(self):
+        events, prompts = self.run_with(True)
+        final = final_of(events)["data"]
+        self.assertEqual(final["research"], {"grounded": True, "provider": "gemini"})
+        self.assertNotIn("no live web data", final["answer_text"])
+        self.assertIn("live web search: yes", prompts[0])
+        self.assertEqual(len(final["sources"]), 1)
+
+    def test_thai_suffix(self):
+        self.assertTrue(ask_pipeline.answer_text("th", "A", "X", {"A": 0.6, "B": 0.3, "none": 0.1}, None, False).endswith("(ไม่มีข้อมูลค้นเว็บสด)"))
+
+
 def paxa_client(handler):
     real = httpx.AsyncClient
     return patch.object(stt.httpx, "AsyncClient", lambda **kw: real(**{**kw, "transport": httpx.MockTransport(handler)}))

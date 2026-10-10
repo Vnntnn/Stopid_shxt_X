@@ -12,7 +12,7 @@
 Tests: `./On-Fly-Jev/venv/bin/python -m unittest tests.test_ask_pipeline` (43 tests, ~2 s, no keys/model).
 
 ## Env vars
-`GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-2.5-flash`), `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`; use `...:online` or let research append it), `LLM_PROVIDER` (`gemini`|`openrouter`|`fake`), `PAXA_API_KEY`, `JEV_MIN_CONF` (0.45).
+`GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-flash-latest`), `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` (default `google/gemini-2.5-flash`; use `...:online` or let research append it), `LLM_PROVIDER` (`gemini`|`openrouter`|`fake`), `PAXA_API_KEY`, `JEV_MIN_CONF` (0.45).
 
 ## Design notes
 - Candidate order is seeded by the normalised text: the forward run maps keys A/B to a shuffled order of the parties, the swapped run uses the reverse. Final `candidates` stay in interpreter order A, B, none. `consistency.forward/swapped` are keyed by candidate identity (mapped back), not Jev key.
@@ -54,3 +54,9 @@ LLM request shapes (Gemini JSON vs search, OpenRouter), 429 retry, fallback, rep
 - Paxa `audio/transcriptions` (multipart fields, Bearer auth, error-body shape; both `{"error":{"code"}}` and `{"error":"code"}` are accepted; status-only fallback mapping).
 - Real LLM quality: the prompts (interpret, research, pool) were never run against a real model, so the one-repair path may fire more or less often than expected.
 - Browser MediaRecorder webm uploads through `/api/stt` (only synthetic multipart tested).
+
+## Live findings
+- `gemini-2.5-flash` is closed to new accounts (404); the default is now `gemini-flash-latest`.
+- Live interpret works. Gemini `google_search` grounding returned 429 RESOURCE_EXHAUSTED on the free-tier key, so research now uses a chain: Gemini grounded -> OpenRouter `:online` (if keyed) -> Gemini ungrounded (no tools, told to use only background knowledge, state its cut-off and uncertainty, never invent figures). The next link runs on 429/403/other HTTP errors and transport errors, not on parse errors.
+- The research stage and FINAL now carry `research: {grounded, provider}`. Ungrounded runs have `sources: []`, notes that start with "No live web search was available...", a short answer_text suffix ("(no live web data)" / "(ไม่มีข้อมูลค้นเว็บสด)"), and the pool prompt is told research was not grounded. Adapter logic and `JEV_MIN_CONF` are unchanged.
+- Mutation-checked: fallback trigger (never falls back / also on parse errors) and the `grounded` flag (llm and pipeline) each fail tests. 52 tests pass.

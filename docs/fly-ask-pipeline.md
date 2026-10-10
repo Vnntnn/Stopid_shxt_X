@@ -59,7 +59,7 @@ header `Authorization: Bearer $PAXA_API_KEY`; response `{"text": "..."}`). The k
 `GET /fly` serves `web/fly.html`. `GET /api/ask/health` -> which providers/keys are configured (booleans only).
 
 ## Config (`.env`, git-ignored; `.env.example` is committed)
-`GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-2.5-flash`, configurable because model names change),
+`GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-flash-latest`; `gemini-2.5-flash` is closed to new accounts, configurable because model names change),
 `OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `LLM_PROVIDER` (`gemini` default; fall back to the other on error),
 `PAXA_API_KEY`, `JEV_MIN_CONF`. A tiny dependency-free `.env` loader. Never log keys.
 
