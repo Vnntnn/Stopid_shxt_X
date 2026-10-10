@@ -16,6 +16,17 @@
     <div class="fallback" id="webgl-fallback" hidden role="status">
       3D view is unavailable in this browser (WebGL is off). The Fly still answers: use the panels.
     </div>
+    <div class="sound" id="sound" role="group" aria-label="Fly sound">
+      <button type="button" class="mute" id="mute" aria-pressed="false" aria-label="Mute fly sound" title="Mute / unmute the fly">🔊</button>
+      <label class="sr-only" for="vol">Fly volume</label>
+      <input type="range" id="vol" min="0" max="100" step="1" value="60" title="Volume">
+      <label class="lvl" for="stupid">Stupid level</label>
+      <select id="stupid" title="How stupid the fly sounds">
+        <option value="0">Off</option>
+        <option value="1">Silly</option>
+        <option value="2" selected>MAXIMUM</option>
+      </select>
+    </div>
   </div>
   <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
 
@@ -72,6 +83,13 @@
     <div id="result" class="result" hidden>
       <p class="echo" id="echo"></p>
       <p class="answer" id="answer"></p>
+      <div class="fly-says" id="fly-says" hidden>
+        <p class="bubble" id="says-text" aria-live="polite"></p>
+        <div class="says-row">
+          <button type="button" class="mini" id="replay-voice" title="Hear the fly again (no new request)">Replay voice</button>
+          <span class="voice-note" id="voice-note" role="status" hidden>Fly lost its voice</span>
+        </div>
+      </div>
       <ul class="bars" id="bars"></ul>
       <div class="meta">
         <span class="chip" id="agree"></span>

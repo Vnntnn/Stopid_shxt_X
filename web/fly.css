@@ -212,3 +212,21 @@ a.open { align-self: flex-start; color: #9ad0ff; font-size: 12.5px; }
 @media (prefers-reduced-motion: reduce) {
   .stages li .dbg > summary::before { transition: none; }
 }
+
+/* ---- Fly sound controls ---- */
+.sound { position: absolute; right: 18px; bottom: 18px; z-index: 3; display: flex; align-items: center; gap: 8px;
+  background: var(--panel); border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 12px 4px 6px; backdrop-filter: blur(6px); }
+.sound .mute { width: 34px; height: 34px; padding: 0; border-radius: 50%; font-size: 17px; line-height: 1; display: grid; place-items: center; }
+.sound .mute[aria-pressed="true"] { background: rgba(229,72,77,.35); border-color: #ff9a9d; }
+.sound input[type="range"] { width: 84px; accent-color: var(--accent); }
+.sound .lvl { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.sound select { font: inherit; font-size: 13px; color: var(--text); background: rgba(0,0,0,.4); border: 1.5px solid var(--line); border-radius: 8px; padding: 2px 4px; }
+.fly-says { margin: 2px 0 10px; }
+.bubble { position: relative; margin: 0 0 6px; padding: 8px 12px; border-radius: 14px 14px 14px 4px; background: rgba(141,255,196,.12);
+  border: 1.5px solid rgba(141,255,196,.45); color: var(--text); font-size: 14px; overflow-wrap: anywhere; }
+.says-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.voice-note { font-size: 12px; color: #ffd27a; }
+@media (max-width: 800px) {
+  .sound { right: 8px; bottom: 8px; gap: 6px; padding-right: 8px; }
+  .sound input[type="range"] { width: 64px; }
+}

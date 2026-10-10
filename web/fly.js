@@ -1,5 +1,7 @@
 import { STAGES, newState, applyEvent, parseNdjsonStream } from '/static/fly-stream.js';
 import { createScene } from '/static/fly-scene.js';
+import { createFlyAudio } from '/static/fly-audio.js';
+import { flySpeech } from '/static/fly-speak.js';
 import { hostnameOf, formatCost, formatPct, formatSeconds, clampText, safeHttpUrl, deriveChecks } from '/static/fly-format.js';
 
 const $ = (id) => document.getElementById(id);
@@ -18,10 +20,121 @@ const scene = createScene($('stage'), { reducedMotion: reduced });
 if (!scene.ok) $('webgl-fallback').hidden = false;
 function fly(state, opts) {
   scene.setState(state, opts);
+  engine.setState(state, opts);
   $('fly-state').textContent = state;
 }
 if (params.has('mock')) window.__fly = { scene };
-addEventListener('pagehide', () => scene.dispose());
+addEventListener('pagehide', () => { scene.dispose(); engine.dispose(); });
+
+// ---- Fly sound (stupid on purpose). Nothing plays until a Send / mic / Replay click unlocks audio. ----
+const engine = createFlyAudio();
+const SOUND_KEY = 'fly.sound';
+const prefs = { muted: false, volume: 0.6, level: 2 };
+try {
+  const j = JSON.parse(localStorage.getItem(SOUND_KEY) || '{}');
+  if (typeof j.muted === 'boolean') prefs.muted = j.muted;
+  if (typeof j.volume === 'number') prefs.volume = Math.min(1, Math.max(0, j.volume));
+  if ([0, 1, 2].includes(j.level)) prefs.level = j.level;
+} catch (_) { /* storage blocked: defaults */ }
+function savePrefs() { try { localStorage.setItem(SOUND_KEY, JSON.stringify(prefs)); } catch (_) { /* ignore */ } }
+function syncSoundUi() {
+  $('mute').setAttribute('aria-pressed', String(prefs.muted));
+  $('mute').textContent = prefs.muted ? '🔇' : '🔊';
+  $('mute').setAttribute('aria-label', prefs.muted ? 'Unmute fly sound' : 'Mute fly sound');
+  $('vol').value = String(Math.round(prefs.volume * 100));
+  $('stupid').value = String(prefs.level);
+}
+engine.setMuted(prefs.muted); engine.setVolume(prefs.volume); engine.setLevel(prefs.level);
+syncSoundUi();
+$('mute').addEventListener('click', () => { engine.unlock(); prefs.muted = !prefs.muted; engine.setMuted(prefs.muted); syncSoundUi(); savePrefs(); });
+$('vol').addEventListener('input', () => { prefs.volume = Number($('vol').value) / 100; engine.setVolume(prefs.volume); savePrefs(); });
+$('stupid').addEventListener('change', () => { prefs.level = Number($('stupid').value); engine.setLevel(prefs.level); savePrefs(); });
+if (params.has('mock') || params.get('debug') === '1') window.__flyAudioDebug = Object.assign(() => engine.debug(), { engine });
+
+// Voice of the current answer: text, TTS fetch (started as soon as the final event arrives), decoded buffer kept for replays.
+let voice = null;
+let runSeq = 0;
+let landTimer = null;
+let speakTimer = null;
+let ttsEnabled = null; // from /api/ask/health, null = unknown (try anyway)
+const JINGLE = { A: 'winA', B: 'winB', none: 'winNone', inconclusive: 'sad' };
+const isPad = (d) => d === 'A' || d === 'B' || d === 'none';
+
+function cancelVoice() {
+  runSeq += 1;
+  clearInterval(landTimer); clearTimeout(speakTimer);
+  if (voice && voice.abort) voice.abort.abort();
+  voice = null;
+  engine.stopVoice();
+  $('fly-says').hidden = true;
+  $('voice-note').hidden = true;
+}
+
+function startVoice(final) {
+  const lang = String(final?.interpretation?.language || 'th').toLowerCase().startsWith('th') ? 'th' : 'en';
+  const v = { final, lang, text: flySpeech(final, lang, prefs.level), buffer: null, failed: false, abort: new AbortController() };
+  v.promise = (async () => {
+    try {
+      if (!engine.supported) throw new Error('no web audio');
+      if (ttsEnabled === null) {
+        try { const h = await fetch('/api/ask/health', { signal: v.abort.signal }); if (h.ok) { const j = await h.json(); if (typeof j.tts === 'boolean') ttsEnabled = j.tts; } } catch (_) { /* unknown: try anyway */ }
+      }
+      if (ttsEnabled === false) throw new Error('tts not configured');
+      const res = await fetch('/api/tts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text: v.text }), signal: v.abort.signal });
+      if (!res.ok) throw new Error(`tts ${res.status}`);
+      v.buffer = await engine.prepareVoice(await res.arrayBuffer());
+    } catch (err) {
+      if (!v.abort.signal.aborted) { v.failed = true; v.error = err; }
+    }
+    return v.buffer;
+  })();
+  return v;
+}
+
+async function speak(v) {
+  engine.stopVoice();
+  const buf = v.buffer || (v.failed ? null : await v.promise);
+  if (v !== voice) return;
+  if (prefs.muted) return;
+  engine.setState('speaking');
+  let played = false;
+  if (buf) played = await engine.playVoice(buf, { seed: v.text });
+  else if (engine.canSpeak) played = await engine.speakFallback(v.text, v.lang);
+  if (v !== voice) return;
+  $('voice-note').hidden = !(v.failed || (!buf && !played));
+  engine.setState('landed');
+}
+
+function onLanded(v, run) {
+  if (v !== voice || run !== runSeq) return;
+  const d = v.final.decision;
+  engine.setState(isPad(d) ? 'landing' : 'landed', { pad: d });
+  engine.playJingle(JINGLE[d] || 'sad');
+  speakTimer = setTimeout(() => speak(v), isPad(d) ? 1150 : 1800);
+}
+
+// Wait for the 3D fly to land (or a timeout when there is no WebGL / the tab is hidden), then the landing sound + voice.
+function watchLanding(v, run) {
+  clearInterval(landTimer);
+  const t0 = performance.now();
+  landTimer = setInterval(() => {
+    if (run !== runSeq) { clearInterval(landTimer); return; }
+    const el_ = performance.now() - t0;
+    const decided = isPad(v.final.decision);
+    const landed = decided ? (scene.ok ? scene.landed : el_ > 3300) : el_ > 3800;
+    if (landed || el_ > 8000) { clearInterval(landTimer); onLanded(v, run); }
+  }, 80);
+}
+
+$('replay-voice').addEventListener('click', () => {
+  if (!voice) return;
+  engine.unlock();
+  clearTimeout(speakTimer);
+  engine.stopVoice();
+  engine.playJingle(JINGLE[voice.final.decision] || 'sad');
+  const v = voice;
+  speakTimer = setTimeout(() => speak(v), 900);
+});
 
 // ---- Ask / stream ----
 let controller = null;
@@ -418,6 +531,8 @@ async function ask(text) {
   text = text.trim();
   if (!text) return;
   lastText = text;
+  engine.unlock();
+  cancelVoice();
   if (controller) controller.abort();
   controller = new AbortController();
   const mine = controller;
@@ -454,8 +569,13 @@ async function ask(text) {
       renderStages(state);
     });
     if (state.final) {
+      voice = startVoice(state.final);
+      const run = runSeq;
       scene.setCandidates(state.final.candidates);
       renderFinal(state.final);
+      $('says-text').textContent = 'Fly says: ' + voice.text;
+      $('fly-says').hidden = false;
+      watchLanding(voice, run);
       const d = state.final.decision;
       if (d === 'A' || d === 'B' || d === 'none') fly('deciding', { pad: d }); else fly('inconclusive');
     } else {
@@ -579,6 +699,7 @@ async function startRecording() {
       let peak = 0;
       for (const v of buf) peak = Math.max(peak, Math.abs(v - 128));
       $('meter-bar').style.width = Math.min(100, (peak / 128) * 160) + '%';
+      engine.setMicLevel(Math.min(1, peak / 80));
       $('mic-time').textContent = fmt(performance.now() - rec.t0);
       rec.raf = requestAnimationFrame(loop);
     };
@@ -605,7 +726,7 @@ function stopRecording(discard = false) {
   rec.ctx?.close().catch(() => {});
   fly('idle');
 }
-$('mic').addEventListener('click', () => (rec.active ? stopRecording() : startRecording()));
+$('mic').addEventListener('click', () => { engine.unlock(); if (rec.active) stopRecording(); else startRecording(); });
 
 async function onRecorded() {
   if (rec.discard) return;
