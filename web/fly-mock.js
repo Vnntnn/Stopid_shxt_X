@@ -108,6 +108,20 @@ export function installMock(params) {
   const decision = mode === 'inconclusive' || mode === 'ungrounded' ? 'inconclusive' : 'A';
   const grounded = mode !== 'ungrounded';
   const D = dataFor(decision, grounded);
+  // ?xss=1 puts markup in strings that come from "the web" / "the LLM" (must render as text everywhere).
+  if (params.get('xss') === '1' && grounded) {
+    const evil = 'Breaking <script>alert(1)</script> <img src=x onerror="window.__xss=1"> end';
+    for (const list of [D.research.sources, D.final.sources]) { list[0] = { ...list[0], snippet: evil, title: evil }; }
+    D.research.facts = [{ text: evil, source_title: '', source_url: '' }, ...D.research.facts.slice(1)];
+    D.final.answer_text = evil;
+  }
+  // ?big=1 pads the sources so the final payload is several hundred KB (exercises lazy rendering / truncation).
+  if (params.get('big') === '1' && grounded) {
+    const pad = Array.from({ length: 300 }, (_, i) => ({ title: `Padding source ${i + 1}`, url: `https://example.com/pad/${i + 1}`, snippet: `ข้อความยาว ${i} `.repeat(120) }));
+    D.research.sources = D.research.sources.concat(pad);
+    D.final.sources = D.final.sources.concat(pad);
+    D.research.facts = D.research.facts.concat([{ text: 'x'.repeat(9000), source_title: '', source_url: '' }]);
+  }
   const realFetch = window.fetch.bind(window);
 
   window.fetch = async (url, opts = {}) => {
