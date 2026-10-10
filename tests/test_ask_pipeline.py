@@ -2,9 +2,11 @@
 No real API keys or model are needed: providers use httpx.MockTransport and Jev is a scripted fake."""
 import asyncio
 import json
+import os
 from pathlib import Path
 import sys
 import tempfile
+import time
 import unittest
 from unittest.mock import patch
 
@@ -19,6 +21,7 @@ import ask_pipeline
 import envload
 import llm as llm_layer
 import stt
+import tts
 
 DEMO = "ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?"
 
@@ -577,6 +580,150 @@ class STTTests(unittest.IsolatedAsyncioTestCase):
         with self.assertRaises(stt.STTError) as ctx:
             await stt.transcribe(b"x" * (stt.MAX_AUDIO_BYTES + 1), env={"PAXA_API_KEY": "k"})
         self.assertEqual(ctx.exception.status, 413)
+
+
+def tts_client(handler):
+    real = httpx.AsyncClient
+    return patch.object(tts.httpx, "AsyncClient", lambda **kw: real(**{**kw, "transport": httpx.MockTransport(handler)}))
+
+
+ENV = {"PAXA_API_KEY": "paxa-secret-key"}
+
+
+class TTSTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.patch = patch.object(tts, "CACHE_DIR", Path(self.tmp.name) / "tts_cache")
+        self.patch.start()
+        tts._calls.clear()
+
+    def tearDown(self):
+        self.patch.stop()
+        self.tmp.cleanup()
+        tts._calls.clear()
+
+    async def test_miss_then_hit_makes_one_upstream_call_with_exact_body(self):
+        seen = []
+
+        def handler(request):
+            seen.append(request)
+            return httpx.Response(200, content=b"ID3mp3", headers={"x-credits-charged": "0.1"})
+        with tts_client(handler):
+            first = await tts.synthesize("  บึ้น\n\x00นน ", env=ENV)
+            second = await tts.synthesize("บึ้น นน", env=ENV)
+        self.assertEqual(first, (b"ID3mp3", False))
+        self.assertEqual(second, (b"ID3mp3", True))
+        self.assertEqual(len(seen), 1)
+        request = seen[0]
+        self.assertEqual(str(request.url), "https://api.paxalabs.com/v1/tts")
+        self.assertEqual(request.headers["authorization"], "Bearer paxa-secret-key")
+        self.assertEqual(json.loads(request.content), {"text": "บึ้น นน", "voice": "lukchup", "model": "paxa-tts-flash-v1",
+                                                         "format": "mp3", "speed": 1, "language": "auto"})
+
+    async def test_env_overrides_voice_and_model(self):
+        seen = []
+        with tts_client(lambda r: (seen.append(r), httpx.Response(200, content=b"a"))[1]):
+            await tts.synthesize("x", env={**ENV, "PAXA_TTS_VOICE": "bualoi", "PAXA_TTS_MODEL": "m2"})
+        self.assertEqual((json.loads(seen[0].content)["voice"], json.loads(seen[0].content)["model"]), ("bualoi", "m2"))
+
+    async def test_validation(self):
+        for text, voice in [("", None), ("   \n ", None), ("x" * 401, None), (None, None), ("ok", "Bad Voice"), ("ok", "a" * 41), ("ok", "../x"), ("ok", "")]:
+            with self.subTest(text=str(text)[:5], voice=voice), tts_client(lambda r: httpx.Response(200, content=b"a")):
+                with self.assertRaises(tts.TTSError) as ctx:
+                    await tts.synthesize(text, voice, env=ENV)
+                self.assertEqual(ctx.exception.status, 422)
+        with tts_client(lambda r: httpx.Response(200, content=b"a")):
+            await tts.synthesize("x" * 400, "ok_voice-1", env=ENV)
+
+    async def test_error_mapping(self):
+        cases = [(402, None, 402, "tts_no_credits"), (403, None, 402, "tts_no_credits"), (429, None, 429, "tts_rate_limited"),
+                 (500, None, 502, "tts_upstream"), (503, None, 502, "tts_upstream"),
+                 (400, "unknown_voice", 502, "tts_rejected"), (422, "unspeakable_text", 502, "tts_rejected"), (401, "unauthorized", 502, "tts_rejected")]
+        for upstream, code, status, ours in cases:
+            tts._calls.clear()
+            with self.subTest(upstream=upstream), tts_client(lambda r, u=upstream, c=code: httpx.Response(u, json={"error": {"code": c}} if c else {})):
+                with self.assertRaises(tts.TTSError) as ctx:
+                    await tts.synthesize("x", env=ENV)
+                self.assertEqual((ctx.exception.status, ctx.exception.code), (status, ours))
+                if code:
+                    self.assertIn(code, ctx.exception.message)
+                self.assertNotIn("paxa-secret-key", ctx.exception.message)
+        with self.assertRaises(tts.TTSError) as ctx:
+            await tts.synthesize("x", env={})
+        self.assertEqual((ctx.exception.status, ctx.exception.code), (503, "tts_not_configured"))
+
+    async def test_timeout_and_5xx_retry_once(self):
+        calls = []
+
+        def flaky(request):
+            calls.append(1)
+            if len(calls) == 1:
+                raise httpx.ReadTimeout("slow")
+            return httpx.Response(200, content=b"ok")
+        with tts_client(flaky):
+            self.assertEqual(await tts.synthesize("x", env=ENV), (b"ok", False))
+        self.assertEqual(len(calls), 2)
+        calls.clear()
+        tts._calls.clear()
+
+        def down(request):
+            calls.append(1)
+            return httpx.Response(503)
+        with tts_client(down), self.assertRaises(tts.TTSError) as ctx:
+            await tts.synthesize("y", env=ENV)
+        self.assertEqual((len(calls), ctx.exception.code), (2, "tts_upstream"))
+        calls.clear()
+        tts._calls.clear()
+        with tts_client(lambda r: (calls.append(1), httpx.Response(400, json={"error": "unknown_voice"}))[1]), self.assertRaises(tts.TTSError):
+            await tts.synthesize("z", env=ENV)
+        self.assertEqual(len(calls), 1)
+
+    async def test_spend_guard_counts_upstream_calls_only(self):
+        calls = []
+        env = {**ENV, "TTS_MAX_CALLS_PER_MIN": "3"}
+        with tts_client(lambda r: (calls.append(1), httpx.Response(200, content=b"a"))[1]):
+            for i in range(3):
+                await tts.synthesize(f"t{i}", env=env)
+            for _ in range(5):  # cache hits are free
+                await tts.synthesize("t0", env=env)
+            with self.assertRaises(tts.TTSError) as ctx:
+                await tts.synthesize("new text", env=env)
+            self.assertEqual((ctx.exception.status, ctx.exception.code), (429, "tts_budget"))
+            tts._calls.clear()
+            tts._calls.extend([time.monotonic() - 61] * 3)  # old calls fall out of the window
+            await tts.synthesize("new text", env=env)
+        self.assertEqual(len(calls), 4)
+
+    async def test_atomic_write_and_pruning(self):
+        with tts_client(lambda r: httpx.Response(200, content=b"a")), patch.object(tts, "CACHE_MAX_FILES", 3):
+            for i in range(5):
+                await tts.synthesize(f"t{i}", env={**ENV, "TTS_MAX_CALLS_PER_MIN": "99"})
+                for f in tts.CACHE_DIR.glob("*.mp3"):  # make mtimes strictly increasing
+                    pass
+                os.utime(tts._cache_path("paxa-tts-flash-v1", "lukchup", f"t{i}"), (1000 + i, 1000 + i))
+        self.assertEqual(list(tts.CACHE_DIR.glob("*.tmp")), [])
+        left = {p.name for p in tts.CACHE_DIR.glob("*.mp3")}
+        self.assertEqual(left, {tts._cache_path("paxa-tts-flash-v1", "lukchup", f"t{i}").name for i in (2, 3, 4)})
+
+    async def test_route(self):
+        client = TestClient(app_module.app)
+        with patch.dict("os.environ", ENV), tts_client(lambda r: httpx.Response(200, content=b"\xff\xfbaudio")):
+            r1 = client.post("/api/tts", json={"text": "สวัสดี"})
+            r2 = client.post("/api/tts", json={"text": "สวัสดี"})
+            self.assertEqual((r1.status_code, r1.headers["content-type"], r1.headers["x-tts-cache"], r1.content),
+                             (200, "audio/mpeg", "miss", b"\xff\xfbaudio"))
+            self.assertEqual((r2.headers["x-tts-cache"], r2.headers["cache-control"]), ("hit", "private, max-age=86400"))
+            self.assertEqual(client.post("/api/tts", json={"text": " "}).status_code, 422)
+            self.assertEqual(client.post("/api/tts", json={"text": "a", "voice": "BAD"}).json()["error"], "invalid_voice")
+            self.assertEqual(client.post("/api/tts", content=b"x" * 5000, headers={"content-type": "application/json"}).status_code, 413)
+            self.assertEqual(client.post("/api/tts", content=b"text", headers={"content-type": "text/plain"}).status_code, 415)
+            self.assertEqual(client.post("/api/tts", json={"text": "a"}, headers={"origin": "http://evil.example"}).status_code, 403)
+            self.assertNotIn("paxa-secret-key", r1.text + str(r1.headers) + client.get("/api/ask/health").text)
+            self.assertIs(client.get("/api/ask/health").json()["tts"], True)
+        with patch.dict("os.environ", {"PAXA_API_KEY": ""}):
+            r = client.post("/api/tts", json={"text": "a"})
+            self.assertEqual((r.status_code, r.json()["error"]), (503, "tts_not_configured"))
+            self.assertIs(client.get("/api/ask/health").json()["tts"], False)
 
 
 class RouteTests(TmpCacheCase):

@@ -11,7 +11,7 @@ import time
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -25,6 +25,7 @@ import llm as llm_layer
 import project_store
 import scrapers
 import stt
+import tts
 log = logging.getLogger("onfly")
 
 
@@ -354,6 +355,7 @@ def fly_page():
 def ask_health():
     llm = llm_layer.LLM()
     return {"openrouter": llm.configured["openrouter"], "fake": llm.configured["fake"], "stt": bool((os.environ.get("PAXA_API_KEY") or "").strip()),
+            "tts": bool((os.environ.get("PAXA_API_KEY") or "").strip()),
             "model_ready": runtime.status == "ready", "cache_entries": ask_pipeline.AskCache().size()}
 
 
@@ -411,3 +413,23 @@ async def speech_to_text(request: Request):
         return await stt.transcribe(audio, filename or "audio.webm", content_type, language or "th")
     except stt.STTError as exc:
         return JSONResponse({"error": exc.code, "message": exc.message}, status_code=exc.status)
+
+
+@app.post("/api/tts")
+async def text_to_speech(request: Request):
+    _check_same_origin(request)
+    if "application/json" not in (request.headers.get("content-type") or "").lower():
+        return JSONResponse({"error": "invalid_text", "message": "Send application/json."}, status_code=415)
+    body = await request.body()
+    if len(body) > 4096:
+        return JSONResponse({"error": "invalid_text", "message": "Request too large."}, status_code=413)
+    try:
+        payload = _json_object(json.loads(body))
+    except (ValueError, UnicodeDecodeError, HTTPException):
+        return JSONResponse({"error": "invalid_text", "message": "Send a JSON object with a text field."}, status_code=422)
+    try:
+        audio, hit = await tts.synthesize(payload.get("text"), payload.get("voice"))
+    except tts.TTSError as exc:
+        return JSONResponse({"error": exc.code, "message": exc.message}, status_code=exc.status)
+    return Response(audio, media_type="audio/mpeg",
+                    headers={"Cache-Control": "private, max-age=86400", "x-tts-cache": "hit" if hit else "miss"})
