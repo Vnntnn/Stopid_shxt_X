@@ -1,0 +1,514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly brain election</title>
+<style>
+:root{
+  --bg:#f3f4f6; --card:#fff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
+  --blue:#1d4ed8; --blue-bg:#dbeafe; --green:#15803d; --green-bg:#e6ffec;
+  --red:#b91c1c; --red-bg:#ffebe9; --amber:#b45309; --amber-bg:#fef3c7; --grey-bg:#f3f4f6;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif}
+.wrap{display:flex;gap:24px;max-width:1200px;margin:0 auto;padding:24px 16px}
+nav.toc{width:200px;flex:none;position:sticky;top:16px;align-self:flex-start;font-size:13px}
+nav.toc a{display:block;color:var(--muted);text-decoration:none;padding:3px 0}
+nav.toc a:hover{color:var(--ink)}
+nav.toc .part{margin:12px 0 4px;font-weight:600;color:var(--ink)}
+main{flex:1;min-width:0}
+h1{font-size:28px;margin:0 0 4px;overflow-wrap:anywhere}
+h2{font-size:20px;margin:0 0 12px}
+h3{font-size:16px;margin:16px 0 8px}
+p{margin:8px 0}
+section{background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:20px 24px;margin:16px 0}
+.summary{color:var(--muted);margin:0 0 8px}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:600;line-height:1.6;white-space:nowrap}
+.pill.blue,.pill.task{background:var(--blue-bg);color:var(--blue)}
+.pill.green{background:var(--green-bg);color:var(--green)}
+.pill.red{background:var(--red-bg);color:var(--red)}
+.pill.amber{background:var(--amber-bg);color:var(--amber)}
+.pill.grey,.pill.unaffected{background:var(--grey-bg);color:var(--muted)}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:14px}
+th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+th{color:var(--muted);font-weight:600;font-size:12px;text-transform:uppercase;letter-spacing:.03em}
+td code,p code,li code{background:var(--grey-bg);padding:1px 5px;border-radius:4px;font-size:13px;overflow-wrap:anywhere}
+.divider{display:flex;align-items:center;gap:12px;margin:40px 0 8px;color:var(--muted);font-weight:600;letter-spacing:.05em;text-transform:uppercase;font-size:12px}
+.divider:before,.divider:after{content:"";flex:1;border-top:2px solid #cbd5e1}
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.frame{border:1px solid var(--line);border-radius:12px;padding:14px;background:#fafafa}
+.frame h4{margin:0 0 10px;font-size:13px;color:var(--muted);text-transform:uppercase;letter-spacing:.03em}
+.flow{display:flex;flex-direction:column;gap:6px}
+.box{border-radius:8px;padding:8px 10px;font-size:13px;background:#fff;border:1px solid var(--line)}
+.box.new{background:var(--green-bg);border-color:#86efac}
+.box.ext{background:var(--blue-bg);border-color:#93c5fd}
+.box.dim{color:var(--muted);border-style:dashed}
+.arrow{color:var(--muted);text-align:center;font-size:12px;line-height:1}
+.bars{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.bar{display:grid;grid-template-columns:110px 1fr 48px;gap:8px;align-items:center}
+.bar i{display:block;height:14px;border-radius:4px;background:#60a5fa}
+.bar.win i{background:#16a34a}
+.muted{color:var(--muted);font-size:13px}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.cols h4{margin:0 0 6px;font-size:13px;color:var(--muted);text-transform:uppercase}
+.cols ul{margin:0;padding-left:18px}
+.tag{font-size:11px;font-weight:600;color:var(--green);margin-left:4px}
+details{margin:10px 0}
+summary{cursor:pointer;color:var(--blue);font-weight:600}
+.diff{border:1px solid var(--line);border-radius:8px;margin:10px 0;overflow-x:auto;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:12.5px}
+.diff .hd{display:flex;justify-content:space-between;gap:12px;padding:6px 10px;background:var(--grey-bg);border-bottom:1px solid var(--line);font-weight:600}
+.diff .hd span:last-child{color:var(--muted);font-weight:400;white-space:nowrap}
+.diff span.l{display:block;white-space:pre;padding:0 10px}
+.diff span.l:before{display:inline-block;width:16px;color:var(--muted)}
+.diff .add{background:var(--green-bg);color:#064e3b}.diff .add:before{content:"+"}
+.diff .del{background:var(--red-bg);color:#7f1d1d}.diff .del:before{content:"-"}
+.diff .ctx{color:#374151}.diff .ctx:before{content:" "}
+.diff .hunk{background:#eff6ff;color:var(--blue)}.diff .hunk:before{content:"@@"}
+.diff .note{display:block;padding:2px 10px 2px 26px;background:#fef9c3;color:#713f12;font-family:-apple-system,sans-serif;font-size:12px}
+.legend{font-size:12px;color:var(--muted);margin:0 0 8px}
+.legend span{display:inline-block;padding:0 6px;border-radius:3px;margin-right:6px}
+.task{border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin:14px 0}
+.task h3{margin:0 0 6px}
+.dep{margin:12px 0}
+.footer{color:var(--muted);font-size:12px;margin:24px 0 0;text-align:center}
+tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-size:13px;letter-spacing:0}
+@media (max-width:1024px){nav.toc{display:none}}
+@media (max-width:768px){
+  .pair,.cols{grid-template-columns:1fr}
+  section{padding:16px}
+  .bar{grid-template-columns:90px 1fr 44px}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+<nav class="toc">
+  <div class="part">Overview</div>
+  <a href="#goal">Goal</a>
+  <a href="#current-problems">Today</a>
+  <a href="#proposed-approach">After</a>
+  <a href="#comparison">Side by side</a>
+  <div class="part">Implementation</div>
+  <a href="#acceptance-criteria">Acceptance criteria</a>
+  <a href="#rollout-risk">Rollout risk</a>
+  <a href="#file-map">File map</a>
+  <a href="#blast-radius">Blast radius</a>
+  <a href="#tasks">Tasks</a>
+  <a href="#test-strategy">Tests</a>
+  <a href="#open-questions">Open questions</a>
+</nav>
+<main>
+
+<h1>Fly brain election</h1>
+<p class="summary">9 files · +8 new · ~1 changed</p>
+<details>
+  <summary>Why</summary>
+  <blockquote>this repo is blank the idea is we want to run a flyfruit brain that opensourceed and we are in a jackathon so we will use it to elect the leader in thailand the rest of the idea is vague please exmine it and talk to me</blockquote>
+  <p class="muted">Answers to the planning questions: demo is a Jupyter notebook; candidates are real Thai parties; input is free text through an LLM; output is a probability per choice, like jev.ai; 12 hours; do not bloat.</p>
+</details>
+
+<section id="goal">
+  <h2>Goal</h2>
+  <p>A notebook where a teammate types a free-text description of each Thai party, and a simulated fruit-fly brain returns a probability for each party. Claude turns the text into two taste signals, the published whole-brain model (Shiu et al. 2024, FlyWire connectome) simulates the response, and the proboscis motor neuron MN9 is the vote.</p>
+</section>
+
+<section id="current-problems">
+  <h2>What the user sees today</h2>
+  <p><span class="pill grey">0 cells · 0 lines</span> The repo holds one 15-byte README. Every step between "party" and "ranking" is missing.</p>
+  <div class="frame">
+    <h4>Today</h4>
+    <div class="flow">
+      <div class="box dim">Party description (in someone's head)</div>
+      <div class="arrow">↓ no code</div>
+      <div class="box dim">Stimulus pattern (which neurons, what Hz)</div>
+      <div class="arrow">↓ no code</div>
+      <div class="box ext">Fly brain model <code>run_exp(...)</code></div>
+      <div class="arrow">↓ no code</div>
+      <div class="box dim">Spike parquet files</div>
+      <div class="arrow">↓ no code</div>
+      <div class="box dim">Ranking</div>
+    </div>
+  </div>
+</section>
+
+<section id="proposed-approach">
+  <h2>What the user will see</h2>
+  <p><span class="pill green">1 notebook · 3 modules · N parties → N probabilities</span> The notebook runs top to bottom. Each party's text becomes an <code>appeal</code> and an <code>aversion</code> score in 0–1. Appeal drives the 21 sugar-sensing neurons, aversion drives the 21 bitter-sensing neurons, both as rates up to 200 Hz. One simulation per party. MN9's firing rate is the party's score, and a softmax over scores gives the probabilities.</p>
+  <div class="frame">
+    <h4>After</h4>
+    <div class="flow">
+      <div class="box">Party description, typed in a notebook cell</div>
+      <div class="arrow">↓ <code>traits.score_party()</code> · Claude, structured output</div>
+      <div class="box new">appeal = 0.8 · aversion = 0.3 · one-line reason</div>
+      <div class="arrow">↓ <code>brain.run_party()</code> · sugar 160 Hz, bitter 60 Hz</div>
+      <div class="box ext">Fly brain model <code>run_exp(neu_exc=SUGAR, neu_exc2=BITTER)</code></div>
+      <div class="arrow">↓ MN9 rate from the parquet</div>
+      <div class="box new">score = 42 Hz</div>
+      <div class="arrow">↓ <code>brain.elect()</code> · softmax over parties</div>
+      <div class="box new">Probability bar chart</div>
+    </div>
+  </div>
+</section>
+
+<section id="comparison">
+  <h2>Side by side</h2>
+  <div class="pair">
+    <div class="frame">
+      <h4>Today — notebook output</h4>
+      <div class="muted">Nothing. No notebook exists.</div>
+    </div>
+    <div class="frame">
+      <h4>After — last cell</h4>
+      <div class="bars">
+        <div class="bar win"><span>Party A</span><i style="width:62%"></i><span>41%</span></div>
+        <div class="bar"><span>Party B</span><i style="width:40%"></i><span>27%</span></div>
+        <div class="bar"><span>Party C</span><i style="width:28%"></i><span>19%</span></div>
+        <div class="bar"><span>Party D</span><i style="width:20%"></i><span>13%</span></div>
+      </div>
+      <div class="muted" style="margin-top:8px">Plus a table: party, appeal, aversion, MN9 Hz, probability.</div>
+    </div>
+  </div>
+  <p class="muted">Trade-off: the text-to-taste mapping is the whole joke and the whole weakness. The notebook prints the two scores and Claude's one-line reason per party so the audience can see the mapping, not only the result.</p>
+</section>
+
+<div class="divider">Part B · Implementation</div>
+<section id="implementation-plan">
+
+<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:60px">AC</th><th>When</th><th>Then</th></tr></thead>
+<tbody>
+<tr><td>AC1</td><td>A teammate follows the README setup and runs <code>pytest</code></td><td>All tests pass.</td></tr>
+<tr><td>AC2</td><td><code>score_party("X", "<i>free text</i>")</code> is called with a valid Anthropic credential</td><td>It returns <code>Traits</code> with <code>appeal</code> and <code>aversion</code> both in [0, 1] and a non-empty <code>reason</code>. An empty description raises <code>ValueError</code> before any API call.</td></tr>
+<tr><td>AC3</td><td><code>run_party(appeal=1.0, aversion=0.0)</code> runs for the first time</td><td>It returns an MN9 rate above 0 Hz and <code>results/s200_b0_n5.parquet</code> exists.</td></tr>
+<tr><td>AC4</td><td><code>run_party(appeal=1.0, aversion=0.0)</code> runs a second time</td><td>It returns the same rate in under 2 s because the parquet is reused.</td></tr>
+<tr><td>AC5</td><td><code>run_party(appeal=0.0, aversion=0.0)</code> runs</td><td>It returns 0.0 and does not raise, even though no neuron spikes.</td></tr>
+<tr><td>AC6</td><td><code>elect()</code> receives N parties with their scores and traits</td><td>It returns N probabilities that sum to 1.0 within 1e-6, the highest score has the highest probability, and equal scores give equal probabilities.</td></tr>
+<tr><td>AC7</td><td>The notebook is run top to bottom with a description filled in for each party</td><td>The last cell shows one horizontal bar per party, labelled with the percentage, and the table above it shows appeal, aversion, MN9 Hz, and probability per party.</td></tr>
+</tbody></table></div>
+
+<h2 id="rollout-risk" style="margin-top:28px">Rollout risk</h2>
+<p>
+  <span class="pill grey">schema · no</span>
+  <span class="pill grey">backfill · no</span>
+  <span class="pill grey">irreversible · no</span>
+  <span class="pill grey">contract-skew · no</span>
+  <span class="pill grey">behavior-swap · no</span>
+  <span class="pill grey">cross-app · no</span>
+</p>
+<p class="muted">Evidence: the repo has one commit (<code>638219c</code>) and one file (<code>README.md</code>, 1 line). There is no database, no deployed service, no consumer. The vendor model is read, never modified.</p>
+<p><strong>Verdict:</strong> no triggers. One PR.</p>
+
+<h2 id="out-of-scope" style="margin-top:28px">Out of scope</h2>
+<ul>
+  <li>Web UI, API server, or live audience input. The notebook cell is the input.</li>
+  <li>3D neuron mesh rendering.</li>
+  <li>Water, olfactory, or auditory neuron groups. The model supports two Poisson rate groups, and sugar plus bitter use both.</li>
+</ul>
+
+<h2 id="edge-cases" style="margin-top:28px">Edge cases</h2>
+<div class="tbl"><table>
+<thead><tr><th>Case</th><th>Result</th></tr></thead>
+<tbody>
+<tr><td>No neuron spikes (both rates 0 Hz), so the parquet has 0 rows</td><td><code>mn9_rate</code> counts 0 matching rows and returns 0.0 (AC5). The vendor <code>get_rate</code> pivot would be empty and raise <code>KeyError</code>, which is why the plan does not use it.</td></tr>
+<tr><td>First simulation on a fresh clone</td><td><code>run_party</code> creates <code>results/</code> before <code>run_exp</code>. Without it, <code>to_parquet</code> fails after minutes of simulation.</td></tr>
+<tr><td>Two parties quantize to the same Hz pair</td><td>Same <code>exp_name</code>, one simulation, one parquet. Both parties get the same score.</td></tr>
+<tr><td><code>n_run</code> is changed after parquets exist</td><td><code>exp_name</code> includes <code>n_run</code>, so old parquets are not reused.</td></tr>
+<tr><td>Claude returns a score outside [0, 1]</td><td>Pydantic <code>Field(ge=0, le=1)</code> rejects it and <code>parse</code> raises. The notebook cell fails loudly instead of running a bad stimulus.</td></tr>
+</tbody></table></div>
+
+<h2 id="file-map" style="margin-top:28px">File map</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:80px">Action</th><th style="width:40%">Path</th><th>Purpose</th></tr></thead>
+<tbody>
+<tr><td>Modify</td><td><code>README.md</code></td><td>Setup: Python 3.11 venv, install, submodule, run notebook.</td></tr>
+<tr><td>Create</td><td><code>requirements.txt</code></td><td>Pinned deps: brian2, pandas, pyarrow, joblib, anthropic, pydantic, matplotlib, jupyter, pytest.</td></tr>
+<tr><td>Create</td><td><code>.gitignore</code></td><td><code>results/</code>, <code>.venv/</code>, <code>.ipynb_checkpoints/</code>, <code>__pycache__/</code>.</td></tr>
+<tr><td>Create</td><td><code>.gitmodules</code></td><td>Written by <code>git submodule add</code>.</td></tr>
+<tr><td>Create</td><td><code>vendor/Drosophila_brain_model</code></td><td>Git submodule of <code>philshiu/Drosophila_brain_model</code>. Ships <code>model.py</code> and the 783 connectome files.</td></tr>
+<tr><td>Create</td><td><code>flyvote/neurons.py</code></td><td>FlyWire ID constants: <code>SUGAR</code> (21), <code>BITTER</code> (21), <code>MN9_LEFT</code>.</td></tr>
+<tr><td>Create</td><td><code>flyvote/brain.py</code></td><td><code>run_party()</code>, <code>mn9_rate()</code>, <code>elect()</code>, <code>softmax()</code>, <code>quantize_hz()</code>. Wraps the vendor <code>run_exp</code>.</td></tr>
+<tr><td>Create</td><td><code>flyvote/traits.py</code></td><td><code>Traits</code> model and <code>score_party()</code> via Claude structured output.</td></tr>
+<tr><td>Create</td><td><code>fly_election.ipynb</code></td><td>The demo: parties dict, traits table, simulations, probability chart.</td></tr>
+<tr><td>Test</td><td><code>tests/test_brain.py</code></td><td>Pure-function tests for <code>softmax</code>, <code>quantize_hz</code>, <code>mn9_rate</code>, and <code>elect</code>.</td></tr>
+</tbody></table></div>
+<p class="muted"><code>flyvote/__init__.py</code> is empty and not listed. The vendor directory is a submodule rather than a copy because the two parquet files are 190 MB and belong to the paper's repo.</p>
+
+<h2 id="blast-radius" style="margin-top:28px">Blast radius: no existing consumer</h2>
+<p>
+  <span class="pill task">0 covered</span>
+  <span class="pill unaffected">1 unaffected</span>
+  <span class="pill amber">0 out of scope</span>
+  <span class="pill red">0 missing</span>
+</p>
+<div class="tbl"><table>
+<thead><tr><th>Consumer</th><th>Where</th><th style="width:110px">Status</th><th>Reason</th></tr></thead>
+<tbody>
+<tr class="group"><th colspan="4">Vendor <code>model.run_exp</code> gains a new caller, <code>flyvote/brain.py</code></th></tr>
+<tr><td><code>example.ipynb</code>, <code>figures.ipynb</code></td><td title="vendor/Drosophila_brain_model/">vendor notebooks</td><td><span class="pill unaffected">unaffected</span></td><td>Vendor files are never edited.</td></tr>
+</tbody></table></div>
+
+<h2 id="tasks" style="margin-top:28px">Tasks</h2>
+<div class="dep">
+<svg viewBox="0 0 640 120" width="100%" style="max-width:640px" role="img" aria-label="Task dependency graph">
+  <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#6b7280"/></marker></defs>
+  <g font-family="-apple-system,sans-serif" font-size="13">
+    <rect x="10" y="10" width="150" height="36" rx="8" fill="#e6ffec" stroke="#86efac"/><text x="85" y="33" text-anchor="middle">1 · Setup</text>
+    <rect x="10" y="60" width="150" height="36" rx="8" fill="#e6ffec" stroke="#86efac"/><text x="85" y="83" text-anchor="middle">2 · brain + neurons</text>
+    <rect x="200" y="60" width="150" height="36" rx="8" fill="#e6ffec" stroke="#86efac"/><text x="275" y="83" text-anchor="middle">3 · traits (Claude)</text>
+    <rect x="450" y="35" width="170" height="36" rx="8" fill="#dbeafe" stroke="#93c5fd"/><text x="535" y="58" text-anchor="middle">4 · Notebook</text>
+    <path d="M160,28 C300,28 380,53 450,53" fill="none" stroke="#6b7280" marker-end="url(#ah)"/>
+    <path d="M160,78 C300,78 380,53 450,53" fill="none" stroke="#6b7280" marker-end="url(#ah)"/>
+    <path d="M350,78 C400,78 420,53 450,53" fill="none" stroke="#6b7280" marker-end="url(#ah)"/>
+  </g>
+</svg>
+<p class="muted">Tasks 1, 2, and 3 run in parallel. Task 4 waits for all three.</p>
+</div>
+<p class="legend"><span style="background:var(--green-bg);color:#064e3b">+ added</span><span style="background:var(--red-bg);color:#7f1d1d">- removed</span><span style="background:var(--grey-bg)">unchanged</span></p>
+
+<article class="task" data-task-id="1" data-depends-on="none">
+  <h3>Task 1 — Set up the environment and vendor the model</h3>
+  <p>Add the paper repo as a git submodule under <code>vendor/</code>, pin dependencies, and write the README setup. The system Python is 3.9.6 and the <code>anthropic</code> 1.x SDK needs 3.10 or newer, so the README uses Python 3.11.</p>
+  <div class="cols">
+    <div><h4>Files</h4><ul>
+      <li>Create <code>requirements.txt</code></li>
+      <li>Create <code>.gitignore</code></li>
+      <li>Create <code>vendor/Drosophila_brain_model</code> (submodule, writes <code>.gitmodules</code>)</li>
+      <li>Modify <code>README.md</code></li>
+    </ul></div>
+    <div><h4>Tests</h4><ul>
+      <li>Seam: manual. Follow the README on a clean venv.</li>
+      <li><code>python -c "import brian2, anthropic"</code> succeeds <span class="tag">manual</span></li>
+      <li><code>ls vendor/Drosophila_brain_model/Connectivity_783.parquet</code> exists <span class="tag">manual</span></li>
+      <li><code>git status</code> after one simulation shows no <code>results/</code> or <code>.venv/</code> entries <span class="tag">manual</span></li>
+    </ul></div>
+  </div>
+  <details><summary>Diff · 4 files</summary>
+    <div class="diff"><div class="hd"><span>.gitignore</span><span>new file</span></div>
+<span class="l add">results/</span>
+<span class="l add">.venv/</span>
+<span class="l add">.ipynb_checkpoints/</span>
+<span class="l add">__pycache__/</span>
+    </div>
+    <div class="diff"><div class="hd"><span>requirements.txt</span><span>new file</span></div>
+<span class="l add">brian2&gt;=2.5.4,&lt;2.8</span>
+<span class="l add">numpy&lt;2</span>
+<span class="l add">pandas</span>
+<span class="l add">pyarrow</span>
+<span class="l add">joblib</span>
+<span class="l add">anthropic&gt;=1.0</span>
+<span class="l add">pydantic&gt;=2</span>
+<span class="l add">matplotlib</span>
+<span class="l add">jupyter</span>
+<span class="l add">pytest</span>
+<span class="note">numpy&lt;2: the vendor model was built on numpy 1.24 and brian2 2.5.x does not support numpy 2.</span>
+    </div>
+    <div class="diff"><div class="hd"><span>vendor/Drosophila_brain_model</span><span>new submodule</span></div>
+<span class="l add">git submodule add https://github.com/philshiu/Drosophila_brain_model.git vendor/Drosophila_brain_model</span>
+    </div>
+    <div class="diff"><div class="hd"><span>README.md</span><span>@@ line 1</span></div>
+<span class="l ctx"># Stopid_shxt_X</span>
+<span class="l add"></span>
+<span class="l add">Fly brain election: a fruit-fly connectome votes on Thai parties.</span>
+<span class="l add"></span>
+<span class="l add">## Setup</span>
+<span class="l add"></span>
+<span class="l add">    brew install python@3.11</span>
+<span class="l add">    python3.11 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
+<span class="l add">    pip install -r requirements.txt</span>
+<span class="l add">    git submodule update --init</span>
+<span class="l add">    export ANTHROPIC_API_KEY=...   # or `ant auth login`</span>
+<span class="l add">    jupyter lab fly_election.ipynb</span>
+    </div>
+  </details>
+</article>
+
+<article class="task" data-task-id="2" data-depends-on="none">
+  <h3>Task 2 — Wrap the brain model: stimulus in, MN9 rate out</h3>
+  <p>Create <code>flyvote/neurons.py</code> with the FlyWire IDs copied from the paper's <code>figures.ipynb</code>, and <code>flyvote/brain.py</code> with the five functions below. <code>run_party</code> quantizes each score to a 20 Hz step so that near-identical parties share a cached parquet, and it puts <code>n_run</code> in <code>exp_name</code> so a changed trial count never reuses a stale file. The MN9 rate is counted straight from the spike parquet: the vendor <code>utils.get_rate</code> pivot raises <code>KeyError</code> on an empty result and loops in Python over every spiking neuron. The vendor import happens inside <code>run_party</code>, so the pure functions test without Brian2 installed.</p>
+  <div class="cols">
+    <div><h4>Files</h4><ul>
+      <li>Create <code>flyvote/neurons.py</code></li>
+      <li>Create <code>flyvote/brain.py</code></li>
+      <li>Create <code>tests/test_brain.py</code></li>
+    </ul></div>
+    <div><h4>Tests</h4><ul>
+      <li>Seam: pure functions in <code>flyvote/brain.py</code>. No Brian2, no network.</li>
+      <li><code>quantize_hz(0.83)</code> returns 160; <code>quantize_hz(0.0)</code> returns 0; <code>quantize_hz(1.0)</code> returns 200 <span class="tag">new</span></li>
+      <li><code>softmax([10, 10])</code> returns [0.5, 0.5]; a higher score gets a higher probability; the sum is 1.0 within 1e-6 <span class="tag">new</span></li>
+      <li><code>mn9_rate(empty_spike_frame, n_run=5)</code> returns 0.0; a frame with 10 MN9 rows over 5 trials returns 2.0 (AC5) <span class="tag">new</span></li>
+      <li><code>elect({"A": 40.0, "B": 10.0}, traits)</code> returns a DataFrame with columns <code>appeal</code>, <code>aversion</code>, <code>mn9_hz</code>, <code>prob</code>, A first (AC6) <span class="tag">new</span></li>
+    </ul></div>
+  </div>
+  <details><summary>Diff · 3 files</summary>
+    <div class="diff"><div class="hd"><span>flyvote/neurons.py</span><span>new file</span></div>
+<span class="l add"># FlyWire IDs from Shiu et al. 2024, figures.ipynb (version 783)</span>
+<span class="l add">SUGAR = [720575940624963786, 720575940630233916, ...]   # 21 labellar sugar GRNs, right</span>
+<span class="l add">BITTER = [720575940621778381, 720575940602353632, ...]  # 21 bitter GRNs</span>
+<span class="l add">MN9_LEFT = 720575940660219265                           # proboscis motor neuron</span>
+    </div>
+    <div class="diff"><div class="hd"><span>flyvote/brain.py</span><span>new file</span></div>
+<span class="l add">from pathlib import Path</span>
+<span class="l add">import numpy as np, pandas as pd</span>
+<span class="l add">from .neurons import SUGAR, BITTER, MN9_LEFT</span>
+<span class="l add"></span>
+<span class="l add">VENDOR = Path(__file__).parent.parent / "vendor" / "Drosophila_brain_model"</span>
+<span class="l add">RESULTS = Path(__file__).parent.parent / "results"</span>
+<span class="l add">STEP_HZ = 20</span>
+<span class="l add"></span>
+<span class="l add">def quantize_hz(score: float) -&gt; int:</span>
+<span class="l add">    return int(round(score * 200 / STEP_HZ)) * STEP_HZ</span>
+<span class="l add"></span>
+<span class="l add">def softmax(scores, temperature: float = 10.0) -&gt; np.ndarray: ...</span>
+<span class="l add"></span>
+<span class="l add">def mn9_rate(df_spikes: pd.DataFrame, n_run: int, t_run_s: float = 1.0) -&gt; float:</span>
+<span class="l add">    return float((df_spikes["flywire_id"] == MN9_LEFT).sum() / (n_run * t_run_s))</span>
+<span class="note">One row per spike in the parquet. Zero rows gives 0.0 with no special case (AC5).</span>
+<span class="l add"></span>
+<span class="l add">def run_party(appeal: float, aversion: float, n_run: int = 5) -&gt; float:</span>
+<span class="l add">    import sys</span>
+<span class="l add">    if str(VENDOR) not in sys.path: sys.path.insert(0, str(VENDOR))</span>
+<span class="l add">    from model import run_exp, default_params</span>
+<span class="l add">    from brian2 import Hz</span>
+<span class="l add">    s, b = quantize_hz(appeal), quantize_hz(aversion)</span>
+<span class="l add">    exp_name = f"s{s}_b{b}_n{n_run}"</span>
+<span class="l add">    params = {**default_params, "r_poi": s * Hz, "r_poi2": b * Hz, "n_run": n_run}</span>
+<span class="l add">    RESULTS.mkdir(parents=True, exist_ok=True)</span>
+<span class="note">run_exp does not create the directory; to_parquet fails after the whole simulation without it.</span>
+<span class="l add">    run_exp(exp_name, neu_exc=SUGAR, neu_exc2=BITTER, params=params,</span>
+<span class="l add">            path_res=RESULTS, path_comp=VENDOR / "Completeness_783.csv",</span>
+<span class="l add">            path_con=VENDOR / "Connectivity_783.parquet", n_proc=-1)</span>
+<span class="note">run_exp returns early when results/&lt;exp_name&gt;.parquet exists (model.py line 337). That is the cache (AC4).</span>
+<span class="l add">    df = pd.read_parquet(RESULTS / f"{exp_name}.parquet")</span>
+<span class="l add">    return mn9_rate(df, n_run, float(params["t_run"]))</span>
+<span class="l add"></span>
+<span class="l add">def elect(scores: dict[str, float], traits: dict, temperature: float = 10.0) -&gt; pd.DataFrame:</span>
+<span class="l add">    # columns: party (index), appeal, aversion, mn9_hz, prob; sorted by prob descending</span>
+<span class="l add">    # traits[party] has .appeal and .aversion</span>
+    </div>
+    <div class="diff"><div class="hd"><span>tests/test_brain.py</span><span>new file</span></div>
+<span class="l add">from flyvote.brain import quantize_hz, softmax, mn9_rate, elect</span>
+<span class="l add"></span>
+<span class="l add">def test_quantize_hz_rounds_to_20hz_steps(): ...</span>
+<span class="l add">def test_softmax_equal_scores_equal_probs_and_sums_to_one(): ...</span>
+<span class="l add">def test_mn9_rate_is_zero_on_empty_frame_and_counts_spikes_per_trial(): ...</span>
+<span class="l add">def test_elect_orders_by_prob_desc(): ...</span>
+    </div>
+  </details>
+</article>
+
+<article class="task" data-task-id="3" data-depends-on="none">
+  <h3>Task 3 — Map free text to taste scores with Claude</h3>
+  <p>Create <code>flyvote/traits.py</code>. One call to <code>client.messages.parse</code> with model <code>claude-opus-5-5</code>, a Pydantic <code>Traits</code> schema, and <code>output_config={"effort": "low"}</code>. The system prompt frames the task as translating a party platform into what a fruit fly tastes. The client takes no API key argument; it reads <code>ANTHROPIC_API_KEY</code> or an <code>ant auth login</code> profile.</p>
+  <div class="cols">
+    <div><h4>Files</h4><ul>
+      <li>Create <code>flyvote/traits.py</code></li>
+    </ul></div>
+    <div><h4>Tests</h4><ul>
+      <li>Seam: manual, in the notebook. A live-API test costs money and the schema check is Pydantic's job.</li>
+      <li>Run <code>score_party("Test", "promises free sugar for every fly")</code>; <code>appeal</code> is above 0.5 and <code>reason</code> is non-empty (AC2) <span class="tag">manual</span></li>
+      <li><code>score_party("Test", "")</code> raises <code>ValueError</code> and makes no API call (AC2) <span class="tag">manual</span></li>
+    </ul></div>
+  </div>
+  <details><summary>Diff · 1 file</summary>
+    <div class="diff"><div class="hd"><span>flyvote/traits.py</span><span>new file</span></div>
+<span class="l add">import anthropic</span>
+<span class="l add">from pydantic import BaseModel, Field</span>
+<span class="l add"></span>
+<span class="l add">SYSTEM = """You translate a Thai political party's platform into what a fruit fly</span>
+<span class="l add">would taste. appeal = sweetness (0..1), aversion = bitterness (0..1).</span>
+<span class="l add">Score the same text the same way every time. reason: one playful sentence."""</span>
+<span class="l add"></span>
+<span class="l add">class Traits(BaseModel):</span>
+<span class="l add">    appeal: float = Field(ge=0, le=1)</span>
+<span class="l add">    aversion: float = Field(ge=0, le=1)</span>
+<span class="l add">    reason: str</span>
+<span class="l add"></span>
+<span class="l add">def score_party(name: str, description: str) -&gt; Traits:</span>
+<span class="l add">    if not description.strip():</span>
+<span class="l add">        raise ValueError(f"{name}: write a description first")</span>
+<span class="note">With an empty description Claude would score the real party from its own knowledge. The team's words, or nothing.</span>
+<span class="l add">    client = anthropic.Anthropic()</span>
+<span class="l add">    response = client.messages.parse(</span>
+<span class="l add">        model="claude-opus-5-5",</span>
+<span class="l add">        max_tokens=1024,</span>
+<span class="l add">        system=SYSTEM,</span>
+<span class="l add">        output_config={"effort": "low"},</span>
+<span class="l add">        messages=[{"role": "user", "content": f"Party: {name}\n\n{description}"}],</span>
+<span class="l add">        output_format=Traits,</span>
+<span class="l add">    )</span>
+<span class="l add">    return response.parsed_output</span>
+<span class="note">No prefill, no forced tool_choice: both return 400 on claude-opus-5-5. Structured output is the supported way to get JSON back.</span>
+    </div>
+  </details>
+</article>
+
+<article class="task" data-task-id="4" data-depends-on="1,2,3">
+  <h3>Task 4 — Write the demo notebook</h3>
+  <p>Create <code>fly_election.ipynb</code> with six cells. The party dict is the only thing a teammate edits: party name to free-text description. Default descriptions are empty strings with a comment to fill them in, so the repo never ships a characterization of a real party, and <code>score_party</code> refuses to run on an empty one. The simulation cell prints a progress line per party because each one takes about one to three minutes on this 10-core machine.</p>
+  <div class="cols">
+    <div><h4>Files</h4><ul>
+      <li>Create <code>fly_election.ipynb</code></li>
+    </ul></div>
+    <div><h4>Tests</h4><ul>
+      <li>Seam: manual. Run all cells with two parties and short descriptions (AC7).</li>
+      <li>Bar chart has one bar per party with a percentage label <span class="tag">manual</span></li>
+      <li>Re-run the simulation cell: it finishes in seconds because every parquet exists (AC4) <span class="tag">manual</span></li>
+    </ul></div>
+  </div>
+  <details><summary>Diff · 1 file</summary>
+    <div class="diff"><div class="hd"><span>fly_election.ipynb</span><span>new file · cell outline</span></div>
+<span class="l add"># 1 · imports</span>
+<span class="l add">from flyvote.traits import score_party</span>
+<span class="l add">from flyvote.brain import run_party, elect</span>
+<span class="l add"></span>
+<span class="l add"># 2 · parties — edit this cell</span>
+<span class="l add">PARTIES = {</span>
+<span class="l add">    "เพื่อไทย": "",       # describe the platform in your own words</span>
+<span class="l add">    "ประชาชน": "",</span>
+<span class="l add">    "ภูมิใจไทย": "",</span>
+<span class="l add">    "ประชาธิปัตย์": "",</span>
+<span class="l add">}</span>
+<span class="l add"></span>
+<span class="l add"># 3 · traits: one Claude call per party, shown as a table (appeal, aversion, reason)</span>
+<span class="l add">traits = {p: score_party(p, d) for p, d in PARTIES.items()}</span>
+<span class="l add"></span>
+<span class="l add"># 4 · simulate: one run_party per party, print a progress line each</span>
+<span class="l add">scores = {p: run_party(t.appeal, t.aversion) for p, t in traits.items()}</span>
+<span class="l add"></span>
+<span class="l add"># 5 · elect: DataFrame of party, appeal, aversion, mn9_hz, prob</span>
+<span class="l add">result = elect(scores, traits)</span>
+<span class="l add"></span>
+<span class="l add"># 6 · chart: horizontal bars, winner in green, percentage labels (matplotlib)</span>
+    </div>
+  </details>
+</article>
+
+<h2 id="test-strategy" style="margin-top:28px">Test strategy</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:120px">Level</th><th>Seam</th><th>Covers</th></tr></thead>
+<tbody>
+<tr><td>Unit</td><td>Pure functions in <code>flyvote/brain.py</code>: <code>quantize_hz</code>, <code>softmax</code>, <code>mn9_rate</code>, <code>elect</code>. No Brian2 import, no network. Runs in under a second.</td><td>AC5, AC6</td></tr>
+<tr><td>Manual</td><td>The notebook, run top to bottom with two parties.</td><td>AC1, AC2, AC3, AC4, AC7</td></tr>
+</tbody></table></div>
+<p class="muted">No automated simulation test: one <code>run_party</code> call takes minutes and needs the 190 MB connectome. No live Claude test: it costs money per run and Pydantic already enforces the schema.</p>
+
+<h2 id="open-questions" style="margin-top:28px">Open questions</h2>
+<div class="tbl"><table>
+<thead><tr><th style="width:50%">Assumption</th><th>Wrong if</th></tr></thead>
+<tbody>
+<tr><td><code>n_run=5</code> trials per party is enough signal for a demo (the paper uses 30).</td><td>MN9 rates swing more than the gap between parties. Fix: raise <code>n_run</code> in the notebook and accept longer runs.</td></tr>
+<tr><td>Softmax temperature 10 Hz spreads probabilities visibly.</td><td>All parties land near 25%, or one lands near 100%. Fix: change <code>temperature</code> in cell 5.</td></tr>
+<tr><td>brian2 2.5.x installs on Python 3.11 with a wheel and compiles with the installed Command Line Tools.</td><td>Install fails. Fix: use Python 3.10, or set <code>prefs.codegen.target = 'numpy'</code> and accept slower runs.</td></tr>
+<tr><td>Claude's refusal path is left unhandled. The skill suggests the server-side <code>fallbacks</code> parameter by default; this plan omits it to keep <code>parse</code> on the non-beta client.</td><td>A party description trips a safety classifier and the cell raises. Fix: reword the description.</td></tr>
+</tbody></table></div>
+
+</section>
+
+<p class="footer">Last updated 2026-10-10 · no ticket · branch fly-brain-election</p>
+</main>
+</div>
+</body>
+</html>
