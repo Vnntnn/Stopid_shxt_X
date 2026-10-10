@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Fly Ask</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/static/fly.css">
+<script type="importmap">
+{ "imports": { "three": "/static/vendor/three.module.min.js" } }
+</script>
+</head>
+<body>
+<main class="frame" id="frame">
+  <div class="stage" id="stage">
+    <div class="fallback" id="webgl-fallback" hidden role="status">
+      3D view is unavailable in this browser (WebGL is off). The Fly still answers: use the panels.
+    </div>
+    <div class="sound" id="sound" role="group" aria-label="Fly sound">
+      <button type="button" class="mute" id="mute" aria-pressed="false" aria-label="Mute fly sound" title="Mute / unmute the fly">🔊</button>
+      <label class="sr-only" for="vol">Fly volume</label>
+      <input type="range" id="vol" min="0" max="100" step="1" value="60" title="Volume">
+      <label class="lvl" for="stupid">Stupid level</label>
+      <select id="stupid" title="How stupid the fly sounds">
+        <option value="0">Off</option>
+        <option value="1">Silly</option>
+        <option value="2" selected>MAXIMUM</option>
+      </select>
+    </div>
+  </div>
+  <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
+
+  <section class="panel you" aria-labelledby="you-title">
+    <h2 id="you-title">You</h2>
+    <p class="hint">Choose what input you use: text or STT</p>
+    <div class="seg" role="tablist" aria-label="Input mode">
+      <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">Text</button>
+      <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">Voice</button>
+    </div>
+
+    <div id="pane-text" role="tabpanel" aria-labelledby="tab-text">
+      <label class="sr-only" for="q">Your question</label>
+      <textarea id="q" rows="3" placeholder="ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?"></textarea>
+      <div class="row">
+        <label class="check"><input type="checkbox" id="replay"> Replay cached</label>
+        <button type="button" class="primary" id="send">Send</button>
+      </div>
+    </div>
+
+    <div id="pane-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
+      <div class="mic-row">
+        <button type="button" class="mic" id="mic" aria-pressed="false" aria-label="Start recording">
+          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12z"/></svg>
+        </button>
+        <div class="mic-info">
+          <div id="mic-status" aria-live="polite">Click the mic to start, click again to stop.</div>
+          <div class="meter" aria-hidden="true"><span id="meter-bar"></span></div>
+          <div class="timer" id="mic-time" aria-hidden="true">0:00</div>
+        </div>
+      </div>
+      <label class="sr-only" for="transcript">Transcript (editable)</label>
+      <textarea id="transcript" rows="2" placeholder="Transcript appears here. You can edit it." hidden></textarea>
+      <div class="row" id="confirm-row" hidden>
+        <span id="countdown" aria-live="polite"></span>
+        <span>
+          <button type="button" id="cancel-send">Cancel</button>
+          <button type="button" class="primary" id="send-voice">Send now</button>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel out" id="out" aria-labelledby="out-title">
+    <div class="out-head">
+      <h2 id="out-title">Output fly</h2>
+      <div class="out-tools">
+        <div class="seg mini" role="tablist" aria-label="Output view" id="view-seg">
+          <button type="button" role="tab" id="view-cards" data-view="cards" aria-selected="true">Cards</button>
+          <button type="button" role="tab" id="view-raw" data-view="raw" aria-selected="false" tabindex="-1" aria-controls="rawview">Raw JSON</button>
+        </div>
+        <button type="button" class="mini" id="expand" aria-pressed="false" title="Show the output in a large drawer for debugging">Expand</button>
+      </div>
+    </div>
+    <p class="empty" id="out-empty">Ask something to see the Fly think.</p>
+    <div id="error" class="error" role="alert" hidden>
+      <span id="error-msg"></span>
+      <button type="button" id="retry">Retry</button>
+    </div>
+    <div id="result" class="result" hidden>
+      <p class="echo" id="echo"></p>
+      <p class="answer" id="answer"></p>
+      <div class="fly-says" id="fly-says" hidden>
+        <p class="bubble" id="says-text" aria-live="polite"></p>
+        <div class="says-row">
+          <button type="button" class="mini" id="replay-voice" title="Hear the fly again (no new request)">Replay voice</button>
+          <span class="voice-note" id="voice-note" role="status" hidden>Fly lost its voice</span>
+        </div>
+      </div>
+      <ul class="bars" id="bars"></ul>
+      <div class="meta">
+        <span class="chip" id="agree"></span>
+        <span class="chip" id="cache" hidden>from cache</span>
+        <span class="chip" id="infer"></span>
+      </div>
+      <div class="src-row" id="src-row" hidden><h3 id="src-title">Sources</h3><ul class="src-chips" id="sources"></ul></div>
+      <p class="disclaimer" id="disclaimer"></p>
+    </div>
+    <div class="stages-bar" id="stages-bar" hidden>
+      <h3>How the Fly got there</h3>
+      <button type="button" class="mini" id="toggle-cards">Expand all</button>
+    </div>
+    <ol class="stages" id="stages" aria-live="polite" hidden></ol>
+    <div class="rawview" id="rawview" hidden>
+      <div class="rawpill" id="rawpill" role="status"></div>
+      <div class="rawbar">
+        <div class="seg mini" role="tablist" aria-label="Raw JSON section" id="raw-tabs">
+          <button type="button" role="tab" id="rt-final" data-tab="final" aria-selected="true" aria-controls="rawpane">Final</button>
+          <button type="button" role="tab" id="rt-stream" data-tab="stream" aria-selected="false" tabindex="-1" aria-controls="rawpane">Stream</button>
+          <button type="button" role="tab" id="rt-session" data-tab="session" aria-selected="false" tabindex="-1" aria-controls="rawpane">Session</button>
+        </div>
+        <span class="rawsize" id="raw-size"></span>
+      </div>
+      <div class="rawbar rawtools">
+        <button type="button" class="mini" id="raw-fold">Collapse all</button>
+        <button type="button" class="mini" id="raw-wrap" aria-pressed="true">Wrap lines</button>
+        <button type="button" class="mini" id="raw-copy">Copy</button>
+        <button type="button" class="mini" id="raw-dl">Download .json</button>
+        <span class="sr-only" id="raw-status" role="status" aria-live="polite"></span>
+      </div>
+      <div class="rawpane" id="rawpane" role="tabpanel" tabindex="0" aria-label="Raw JSON"></div>
+    </div>
+  </section>
+</main>
+<script type="module" src="/static/fly.js"></script>
+</body>
+</html>

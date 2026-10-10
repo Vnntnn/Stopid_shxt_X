@@ -5,3 +5,4 @@ vendor/onfly/*.pt
 vendor/onfly/*.part
 .runtime/
 .DS_Store
+.env
