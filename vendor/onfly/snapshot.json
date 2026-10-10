@@ -1,0 +1,9 @@
+{
+  "repo": "Quazim0t0/On-Fly-Jev",
+  "revision": "e11d5a2a328b34aab7956ae4891b6b34b98425b5",
+  "sha256": {
+    "On-Fly-Jev.pt": "9e83bb449d9d4e98b8e035c8d518b0a9d6302413532bebcb5ce10982a1a43e2b",
+    "fly100.pt": "1eece50950655756c94a1266f47d41b3ef9099b8ba039329aa86e562c295a432"
+  },
+  "local_patch": "torch.load weights_only=True"
+}

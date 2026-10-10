@@ -1,0 +1,232 @@
+<div id="fly-choice-app" lang="th" aria-label="Fly Choice ต้นแบบระบบเลือกจากข้อความนโยบาย">
+  <header class="fc-header">
+    <div class="fc-brand"><span aria-hidden="true">🪰</span><span>FLY<span class="fc-brand-slash">/</span>CHOICE</span></div>
+    <span class="fc-mode">MOCK · ไม่ได้รันสมองหรือ Jev</span>
+  </header>
+  <div class="fc-intro">
+    <div class="fc-eyebrow">A VERY SMALL VOTER. A VERY BIG DECISION.</div>
+    <h1>ให้แมลงวันเลือก.</h1>
+    <p>ใส่สถานการณ์และนโยบาย แล้วรับคำตอบเป็นหนึ่งตัวเลือก</p>
+  </div>
+  <div class="fc-workspace">
+    <form id="fc-form" class="fc-editor" novalidate>
+      <section class="fc-state">
+        <div class="fc-section-heading"><h2><span class="fc-step">01</span> สถานการณ์ของแมลงวัน</h2><label class="fc-sr" for="fc-persona">สถานการณ์ตัวอย่าง</label><select id="fc-persona" class="fc-select"><option value="hungry">หิวจัด</option><option value="fearful">กลัวอันตราย</option><option value="balanced">สมดุล</option><option value="custom">กำหนดเอง</option></select></div>
+        <label for="fc-state" class="fc-sr">ข้อความสถานการณ์</label>
+        <textarea id="fc-state" class="fc-textarea fc-state-text" maxlength="800" rows="2">แมลงวันหิวจัด อาหารใกล้หมด ต้องการอาหารมากกว่าที่หลบภัย</textarea>
+        <div id="fc-state-hint" class="fc-hint">กติกาตัวอย่าง: ให้น้ำหนักอาหารสูง</div>
+      </section>
+      <section class="fc-options">
+        <div class="fc-section-heading"><h2><span class="fc-step">02</span> ตัวเลือกนโยบาย</h2><span class="fc-hint">ตัวอย่างสมมติ · แก้ข้อความได้</span></div>
+        <div class="fc-option" data-option="A">
+          <div class="fc-option-heading"><span class="fc-option-key">A</span><label class="fc-sr" for="fc-name-a">ชื่อพรรค A</label><input id="fc-name-a" class="fc-name" value="พรรคกล้วย" maxlength="60"></div>
+          <label for="fc-policy-a" class="fc-sr">นโยบายพรรค A</label>
+          <textarea id="fc-policy-a" class="fc-textarea" maxlength="2400" rows="3">แจกผลไม้ฟรี เปิดถังขยะให้เข้าถึงอาหาร เพิ่มไม้ตีแมลงวันเพื่อความสะอาด</textarea>
+          <label class="fc-source-label" for="fc-source-a">แหล่งอ้างอิง <span>· URL อย่างเดียวจะยังไม่ถูกอ่าน</span></label>
+          <input id="fc-source-a" class="fc-source" type="url" placeholder="วางลิงก์ แล้วคัดลอกนโยบายลงช่องด้านบน" maxlength="600">
+        </div>
+        <div class="fc-option" data-option="B">
+          <div class="fc-option-heading"><span class="fc-option-key">B</span><label class="fc-sr" for="fc-name-b">ชื่อพรรค B</label><input id="fc-name-b" class="fc-name" value="พรรคฝาชี" maxlength="60"></div>
+          <label for="fc-policy-b" class="fc-sr">นโยบายพรรค B</label>
+          <textarea id="fc-policy-b" class="fc-textarea" maxlength="2400" rows="3">เพิ่มที่หลบภัย ลดการใช้ยาฆ่าแมลง ปิดถังขยะเพื่อลดกลิ่น</textarea>
+          <label class="fc-source-label" for="fc-source-b">แหล่งอ้างอิง <span>· URL อย่างเดียวจะยังไม่ถูกอ่าน</span></label>
+          <input id="fc-source-b" class="fc-source" type="url" placeholder="วางลิงก์ แล้วคัดลอกนโยบายลงช่องด้านบน" maxlength="600">
+        </div>
+      </section>
+      <div id="fc-error" class="fc-error" role="alert" hidden></div>
+      <div class="fc-run-row"><button type="submit" class="fc-run cursor-interaction">ให้แมลงวันเลือก <span aria-hidden="true">↗</span></button><span class="fc-hint">ข้อความ → กติกา mock → choice</span></div>
+    </form>
+    <section class="fc-result" aria-label="ผลการเลือกและการตีความข้อความ">
+      <div class="fc-result-heading"><span class="fc-eyebrow">DECISION OUTPUT</span><span class="fc-engine">mock-rules-v1</span></div>
+      <div class="fc-result-summary" aria-live="polite" aria-atomic="true"><span id="fc-run-state" class="fc-hint">ผลจากตัวอย่างเริ่มต้น</span><h2 id="fc-winner">—</h2><div id="fc-choice-label" class="fc-choice-label">choice: —</div></div>
+      <div class="fc-arena" role="img" id="fc-arena" aria-label="ภาพประกอบการเลือกจากกติกา mock">
+        <div class="fc-arena-ground"></div>
+        <div class="fc-fly-track"><span class="fc-fly" aria-hidden="true">🪰</span></div>
+        <div class="fc-booths"><div data-booth="A"><span>A</span><b id="fc-booth-a">พรรคกล้วย</b></div><div data-booth="abstain"><span>∅</span><b>งดออกเสียง</b></div><div data-booth="B"><span>B</span><b id="fc-booth-b">พรรคฝาชี</b></div></div>
+      </div>
+      <p id="fc-reason" class="fc-reason"></p>
+      <div class="fc-news"><span>พาดหัวเล่น ๆ</span><p id="fc-headline"></p></div>
+      <details class="fc-trace" open><summary class="cursor-interaction">สิ่งที่กติกาอ่านจากข้อความ <span>↙</span></summary><div id="fc-trace-content"></div></details>
+      <details class="fc-json"><summary class="cursor-interaction">ดูผลแบบ Decision API <code>JSON</code></summary><pre id="fc-json-output"></pre></details>
+      <div class="fc-footnote">จับวลีตามกติกาที่เขียนไว้ · คะแนนไม่ใช่ความน่าจะเป็น · ข้อความที่ไม่รู้จักอาจนำไปสู่งดออกเสียง</div>
+    </section>
+  </div>
+</div>
+<style>
+  #fly-choice-app { color-scheme: light dark; --fc-bg: light-dark(#faf9f6,#151713); --fc-surface: light-dark(#ffffff,#1d201b); --fc-soft: light-dark(#eeeee7,#292e25); --fc-ink: light-dark(#242a20,#edf1e7); --fc-muted: light-dark(#65705e,#b2bcaa); --fc-line: light-dark(#d8ddcf,#3b4334); --fc-accent: light-dark(#405c22,#badf81); --fc-accent-ink: light-dark(#ffffff,#18240c); --fc-signal: light-dark(#e7f1d6,#354626); --fc-negative: light-dark(#914125,#eca182); --fc-radius: 16px; --fc-gap: 24px; background: var(--fc-bg); color: var(--fc-ink); border-radius: var(--fc-radius); font: 400 14px/1.55 ui-sans-serif,system-ui,-apple-system,"Thonburi",sans-serif; padding: 0 30px 28px; box-sizing: border-box; }
+  #fly-choice-app * { box-sizing: border-box; }
+  #fly-choice-app .fc-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 20px 90px 20px 0; border-bottom: 1px solid var(--fc-line); }
+  #fly-choice-app .fc-brand { display:flex; align-items:center;gap:10px;font:500 15px/1.4 ui-monospace,monospace;letter-spacing:.08em; }
+  #fly-choice-app .fc-brand > span:first-child { font-size: 23px; }
+  #fly-choice-app .fc-brand-slash { color:var(--fc-muted);padding:0 5px; }
+  #fly-choice-app .fc-mode { font-size:12px; color:var(--fc-muted); background:var(--fc-soft); border-radius:20px;padding:5px 10px; }
+  #fly-choice-app .fc-intro { padding:26px 0 24px; }
+  #fly-choice-app .fc-eyebrow { font:500 10px/1.5 ui-monospace,monospace;letter-spacing:.09em;color:var(--fc-muted); }
+  #fly-choice-app h1 { font-size:36px;line-height:1.25;font-weight:500;letter-spacing:-.025em;margin:8px 0; }
+  #fly-choice-app .fc-intro p { margin:0;color:var(--fc-muted); }
+  #fly-choice-app .fc-workspace { display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:var(--fc-gap);align-items:start; }
+  #fly-choice-app h2 { font-size:15px;line-height:1.5;font-weight:500;margin:0; }
+  #fly-choice-app .fc-section-heading { display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:12px; }
+  #fly-choice-app .fc-step { font:400 11px/1.5 ui-monospace,monospace;color:var(--fc-muted);margin-right:7px; }
+  #fly-choice-app input,#fly-choice-app textarea,#fly-choice-app select,#fly-choice-app button { font:inherit;color:inherit; }
+  #fly-choice-app textarea,#fly-choice-app input { min-width:0;max-width:100%; }
+  #fly-choice-app .fc-textarea { width:100%;display:block;resize:vertical;background:var(--fc-surface);border:1px solid var(--fc-line);border-radius:9px;padding:12px;line-height:1.7;min-height:96px; }
+  #fly-choice-app .fc-state-text { min-height:80px; }
+  #fly-choice-app .fc-select { background:var(--fc-surface);border:1px solid var(--fc-line);border-radius:7px;padding:5px 8px;max-width:100%; }
+  #fly-choice-app .fc-hint { font-size:12px;color:var(--fc-muted); }
+  #fly-choice-app #fc-state-hint { margin-top:7px; }
+  #fly-choice-app .fc-options { margin-top:24px; }
+  #fly-choice-app .fc-option { margin-bottom:14px;padding:14px;border:1px solid var(--fc-line);background:var(--fc-surface);border-radius:var(--fc-radius); }
+  #fly-choice-app .fc-option-heading { display:flex;align-items:center;gap:10px;margin-bottom:10px; }
+  #fly-choice-app .fc-option-key { font:500 12px/1.5 ui-monospace,monospace;background:var(--fc-soft);width:27px;height:27px;display:grid;place-items:center;border-radius:6px;flex-shrink:0; }
+  #fly-choice-app .fc-name { width:100%;border:0;background:transparent;padding:3px 0;font-weight:500; }
+  #fly-choice-app .fc-source-label { display:block;margin-top:10px;font-size:11px;color:var(--fc-muted); }
+  #fly-choice-app .fc-source { width:100%;margin-top:3px;padding:6px 0;border:0;border-bottom:1px solid var(--fc-line);background:transparent;font-size:12px; }
+  #fly-choice-app input::placeholder { color:var(--fc-muted);opacity:1; }
+  #fly-choice-app .fc-run-row { display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-top:18px; }
+  #fly-choice-app .fc-run { background:var(--fc-accent);color:var(--fc-accent-ink);border:0;border-radius:9px;padding:11px 17px;font-weight:500;display:flex;align-items:center;gap:20px; }
+  #fly-choice-app .fc-run:hover { filter:brightness(.95); }
+  #fly-choice-app .fc-error { color:var(--fc-negative);margin-top:8px; }
+  #fly-choice-app .fc-result { min-width:0;background:var(--fc-surface);border:1px solid var(--fc-line);border-radius:var(--fc-radius);padding:20px; }
+  #fly-choice-app .fc-result-heading { display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;padding-bottom:15px;border-bottom:1px solid var(--fc-line); }
+  #fly-choice-app .fc-engine { color:var(--fc-muted);font:400 10px/1.5 ui-monospace,monospace; }
+  #fly-choice-app .fc-result-summary { padding:18px 0 10px; }
+  #fly-choice-app #fc-winner { font-size:27px;line-height:1.4;overflow-wrap:anywhere;margin:5px 0 8px; }
+  #fly-choice-app .fc-choice-label { display:inline-block;background:var(--fc-signal);color:var(--fc-accent);font:500 12px/1.5 ui-monospace,monospace;padding:4px 9px;border-radius:5px; }
+  #fly-choice-app .fc-arena { position:relative;margin:14px 0 15px;overflow:hidden; }
+  #fly-choice-app .fc-arena-ground { position:absolute;inset:0 0 10px;background:radial-gradient(circle,var(--fc-line) 1px,transparent 1px);background-size:14px 14px;mask-image:linear-gradient(transparent,var(--fc-ink));opacity:.5; }
+  #fly-choice-app .fc-fly-track { position:relative;height:105px; }
+  #fly-choice-app .fc-fly { position:absolute;left:50%;top:30px;transform:translateX(-50%) rotate(-12deg);font-size:36px;transition:left .65s cubic-bezier(.22,1,.36,1),transform .65s ease; }
+  #fly-choice-app .fc-booths { position:relative;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px; }
+  #fly-choice-app .fc-booths > div { display:flex;flex-direction:column;align-items:center;gap:5px;text-align:center;padding:10px 4px;border-top:2px solid var(--fc-line);color:var(--fc-muted);min-width:0; }
+  #fly-choice-app .fc-booths span { font:500 15px/1.5 ui-monospace,monospace; }
+  #fly-choice-app .fc-booths b { font-size:12px;font-weight:400;overflow-wrap:anywhere; }
+  #fly-choice-app .fc-booths .fc-chosen { border-top-color:var(--fc-accent);background:var(--fc-signal);color:var(--fc-ink);border-radius:0 0 7px 7px; }
+  #fly-choice-app .fc-reason { font-size:13px;margin:0 0 15px; }
+  #fly-choice-app .fc-news { background:var(--fc-soft);padding:12px 14px;border-radius:9px;margin-bottom:16px; }
+  #fly-choice-app .fc-news > span { color:var(--fc-muted);font-size:11px; }
+  #fly-choice-app .fc-news p { margin:3px 0 0;font-weight:500; }
+  #fly-choice-app details { border-top:1px solid var(--fc-line);padding-top:12px;margin-top:12px; }
+  #fly-choice-app summary { font-weight:500;font-size:12px; }
+  #fly-choice-app summary > span,#fly-choice-app summary > code { float:right;color:var(--fc-muted);font-size:11px;font-weight:400; }
+  #fly-choice-app .fc-trace-group { margin-top:14px; }
+  #fly-choice-app .fc-trace-title { display:flex;justify-content:space-between;align-items:baseline;gap:8px;font-size:12px;margin-bottom:7px; }
+  #fly-choice-app .fc-trace-title > span:last-child { color:var(--fc-muted);font-family:ui-monospace,monospace;white-space:nowrap; }
+  #fly-choice-app .fc-match { display:flex;gap:8px;align-items:start;font-size:12px;margin-top:5px; }
+  #fly-choice-app .fc-impact { color:var(--fc-accent);white-space:nowrap; }
+  #fly-choice-app .fc-impact.fc-risk { color:var(--fc-negative); }
+  #fly-choice-app .fc-match q { overflow-wrap:anywhere; }
+  #fly-choice-app .fc-unknown { color:var(--fc-muted);font-size:12px; }
+  #fly-choice-app .fc-json pre { font:400 11px/1.6 ui-monospace,monospace;white-space:pre-wrap;overflow-wrap:anywhere;background:var(--fc-soft);padding:12px;border-radius:7px;margin:10px 0 0; }
+  #fly-choice-app .fc-footnote { font-size:11px;color:var(--fc-muted);margin-top:15px; }
+  #fly-choice-app .fc-sr { position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0; }
+  @media(max-width:740px) { #fly-choice-app { padding:0 18px 22px; } #fly-choice-app .fc-workspace { grid-template-columns:1fr; } #fly-choice-app .fc-header { padding-right:0; } }
+  @media(max-width:420px) { #fly-choice-app { padding:0 12px 18px; } #fly-choice-app h1 { font-size:30px; } #fly-choice-app .fc-result { padding:15px; } #fly-choice-app .fc-section-heading { align-items:start; } #fly-choice-app .fc-option { padding:11px; } #fly-choice-app textarea,#fly-choice-app input,#fly-choice-app select { font-size:16px; } #fly-choice-app .fc-source { font-size:16px; } #fly-choice-app .fc-eyebrow { letter-spacing:.02em; } }
+  @media(pointer:coarse) { #fly-choice-app .fc-select,#fly-choice-app summary,#fly-choice-app .fc-source,#fly-choice-app .fc-name { min-height:44px; } }
+  @media(prefers-reduced-motion:reduce) { #fly-choice-app .fc-fly { transition:none; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('fly-choice-app');
+  const el = id => root.querySelector('#'+id);
+  const presets = {
+    hungry:{text:'แมลงวันหิวจัด อาหารใกล้หมด ต้องการอาหารมากกว่าที่หลบภัย',weights:{food:2.2,shelter:.5,danger:1},hint:'กติกาตัวอย่าง: ให้น้ำหนักอาหารสูง'},
+    fearful:{text:'แมลงวันกลัวอันตราย ต้องการความปลอดภัยและที่หลบภัยเป็นหลัก',weights:{food:.65,shelter:1.4,danger:2.3},hint:'กติกาตัวอย่าง: ให้น้ำหนักการหลีกเลี่ยงอันตรายสูง'},
+    balanced:{text:'แมลงวันต้องการอาหาร ที่หลบภัย และความปลอดภัยอย่างสมดุล',weights:{food:1,shelter:.9,danger:1.4},hint:'กติกาตัวอย่าง: ชั่งอาหาร ที่หลบภัย และอันตรายร่วมกัน'}
+  };
+  const rules = [
+    {rx:/แจก(?:อาหาร|ผลไม้|กล้วย)|(?:อาหาร|ผลไม้|กล้วย)ฟรี|free food|free fruit|free bananas/ig,dim:'food',amount:2,label:'เพิ่มอาหาร'},
+    {rx:/เปิดถังขยะ|เพิ่มอาหาร|ลดค่าอาหาร|เพิ่มแหล่งอาหาร/ig,dim:'food',amount:1,label:'เพิ่มอาหาร'},
+    {rx:/(?<!เ)ปิดถังขยะ|ลดเศษอาหาร|จำกัดอาหาร|เก็บขยะมิดชิด|remove food|less food/ig,dim:'food',amount:-2,label:'ลดอาหาร'},
+    {rx:/เพิ่มที่หลบภัย|สร้างที่หลบภัย|เพิ่มแหล่งพัก|more shelter|safe shelter/ig,dim:'shelter',amount:2,label:'เพิ่มที่หลบภัย'},
+    {rx:/ลดที่หลบภัย|รื้อที่หลบภัย|remove shelter/ig,dim:'shelter',amount:-2,label:'ลดที่หลบภัย'},
+    {rx:/ลด(?:การใช้)?ยาฆ่าแมลง|ลดไม้ตีแมลงวัน|ลดกับดัก|ห้ามใช้ยาฆ่าแมลง|less pesticide/ig,dim:'danger',amount:-2,label:'ลดอันตราย'},
+    {rx:/เพิ่มไม้ตี(?:แมลงวัน)?|เพิ่มกับดัก|ฉีดยาฆ่าแมลง|เพิ่ม(?:การใช้)?ยาฆ่าแมลง|กำจัดแมลงวัน|more pesticide/ig,dim:'danger',amount:2,label:'เพิ่มอันตราย'}
+  ];
+  const fields=['fc-state','fc-name-a','fc-name-b','fc-policy-a','fc-policy-b','fc-source-a','fc-source-b'];
+  let lastResult = null;
+  function readInputs() { return Object.fromEntries(fields.map(id=>[id,el(id).value])); }
+  function remember() {
+    if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{prototype:'fly-choice-text-mock',input:readInputs(),persona:el('fc-persona').value,result:lastResult},privateContent:{traceOpen:root.querySelector('.fc-trace').open,jsonOpen:root.querySelector('.fc-json').open}}).catch(()=>{});
+  }
+  function restore(snapshot) {
+    const c=snapshot?.modelContent;if(c?.prototype!=='fly-choice-text-mock')return;
+    if(c.input)fields.forEach(id=>{if(typeof c.input[id]==='string')el(id).value=c.input[id].slice(0,el(id).maxLength);});
+    if(['hungry','fearful','balanced','custom'].includes(c.persona))el('fc-persona').value=c.persona;
+    const p=snapshot.privateContent;if(p){root.querySelector('.fc-trace').open=p.traceOpen!==false;root.querySelector('.fc-json').open=!!p.jsonOpen;}
+    updateStateHint();
+  }
+  function stateContext() {
+    const p=el('fc-persona').value;
+    if(presets[p])return {...presets[p],key:p};
+    const t=el('fc-state').value;
+    if(/กลัว|อันตราย|ปลอดภัย|fear|danger/i.test(t))return {...presets.fearful,key:'custom-fearful'};
+    if(/หิว|ขาดอาหาร|อาหารใกล้หมด|hungry|starving/i.test(t))return {...presets.hungry,key:'custom-hungry'};
+    return {...presets.balanced,key:'custom-balanced'};
+  }
+  function updateStateHint(){el('fc-state-hint').textContent=(el('fc-persona').value==='custom'?'จับคำในสถานการณ์ · ':'')+stateContext().hint;}
+  function encode(text) {
+    const impact={food:0,shelter:0,danger:0},matches=[];
+    for(const r of rules){r.rx.lastIndex=0;let m;while((m=r.rx.exec(text))!==null){matches.push({phrase:m[0],dimension:r.dim,change:r.amount,label:r.label});impact[r.dim]+=r.amount;}}
+    for(const dim of Object.keys(impact))impact[dim]=Math.max(-2,Math.min(2,impact[dim]));
+    return {impact,matches};
+  }
+  function stale(){if(lastResult)el('fc-run-state').textContent='ข้อความเปลี่ยนแล้ว · กดเลือกใหม่เพื่ออัปเดต';}
+  function validate(){
+    const fail=msg=>{el('fc-error').hidden=false;el('fc-error').textContent=msg;return false;};
+    if(!el('fc-state').value.trim())return fail('ใส่สถานการณ์ของแมลงวันก่อนครับ');
+    for(const p of ['a','b']){
+      if(!el('fc-name-'+p).value.trim())return fail('ใส่ชื่อให้ครบทั้งสองตัวเลือก');
+      if(!el('fc-policy-'+p).value.trim())return fail('วางข้อความนโยบายให้ครบทั้งสองฝั่ง — mock นี้ยังอ่านนโยบายจาก URL ไม่ได้');
+      const source=el('fc-source-'+p).value.trim();if(source){try{const url=new URL(source);if(!['http:','https:'].includes(url.protocol))throw Error();}catch{return fail('ลิงก์อ้างอิงต้องขึ้นต้นด้วย https:// หรือ http://');}}
+    }
+    el('fc-error').hidden=true;return true;
+  }
+  function renderTrace(options){
+    const container=el('fc-trace-content');container.replaceChildren();
+    options.forEach(o=>{
+      const group=document.createElement('div');group.className='fc-trace-group';
+      const heading=document.createElement('div');heading.className='fc-trace-title';
+      const name=document.createElement('span');name.textContent=o.key+' · '+o.name;
+      const score=document.createElement('span');score.textContent='คะแนน mock '+o.score.toFixed(2);heading.append(name,score);group.append(heading);
+      if(!o.matches.length){const none=document.createElement('div');none.className='fc-unknown';none.textContent='ไม่มีวลีตรงกับกติกา — ไม่ได้แปลว่าพรรคนี้ไม่มีนโยบายที่ดี';group.append(none);}
+      o.matches.forEach(m=>{const row=document.createElement('div');row.className='fc-match';const tag=document.createElement('span');tag.className='fc-impact'+((m.dimension==='danger'&&m.change>0)||(m.dimension!=='danger'&&m.change<0)?' fc-risk':'');tag.textContent=m.label;const quote=document.createElement('q');quote.textContent=m.phrase;row.append(tag,quote);group.append(row);});
+      container.append(group);
+    });
+  }
+  function run(initial=false){
+    if(!validate())return;
+    const context=stateContext(),weights=context.weights;
+    const options=['a','b'].map(p=>{const data=encode(el('fc-policy-'+p).value);return {key:p.toUpperCase(),name:el('fc-name-'+p).value.trim(),source:el('fc-source-'+p).value.trim()||null,...data,score:Number((data.impact.food*weights.food+data.impact.shelter*weights.shelter-data.impact.danger*weights.danger).toFixed(2))};});
+    const [a,b]=options;
+    let choice='abstain',basis='';
+    if(!a.matches.length||!b.matches.length)basis='กติกาอ่านนโยบายได้ไม่ครบทั้งสองฝั่ง จึงยังเปรียบเทียบไม่ได้';
+    else if(Math.max(a.score,b.score)<=.4)basis='ทั้งสองตัวเลือกได้คะแนนตามกติกาต่ำ จึงงดออกเสียง';
+    else if(Math.abs(a.score-b.score)<.45)basis='คะแนนตามกติกาใกล้กันเกินไป จึงงดออกเสียง';
+    else {choice=a.score>b.score?'A':'B';basis='ตามกติกา mock ในสถานการณ์นี้ '+options.find(o=>o.key===choice).name+' ได้คะแนนสูงกว่า';}
+    const picked=options.find(o=>o.key===choice);
+    el('fc-winner').textContent=picked?'เลือก'+picked.name:'งดออกเสียง';
+    el('fc-choice-label').textContent='choice: "'+choice+'"';
+    el('fc-run-state').textContent=initial?'ผลจากตัวอย่างเริ่มต้น':'ผลจากข้อความที่คุณส่ง · mock';
+    el('fc-reason').textContent=basis;
+    el('fc-booth-a').textContent=a.name;el('fc-booth-b').textContent=b.name;
+    el('fc-arena').setAttribute('aria-label','ภาพประกอบผลกติกา mock: '+(picked?picked.name:'งดออกเสียง'));
+    const fly=root.querySelector('.fc-fly');if(initial)fly.style.transition='none';else fly.style.removeProperty('transition');fly.style.left=choice==='A'?'16.66%':choice==='B'?'83.33%':'50%';fly.style.transform='translateX(-50%) rotate('+(choice==='A'?-18:choice==='B'?18:0)+'deg)';
+    root.querySelectorAll('[data-booth]').forEach(booth=>booth.classList.toggle('fc-chosen',booth.dataset.booth===choice));
+    el('fc-headline').textContent=!picked?'ผู้มีสิทธิ์ยังไม่ปักใจ ขอวนดูถังขยะก่อน':context.key.includes('hungry')?'แมลงวันเลือก'+picked.name+' หลังท้องร้องแทรกการดีเบต':context.key.includes('fearful')?'ผู้มีสิทธิ์เลือก'+picked.name+' ยืนยันต้องรอดก่อนถึงจะเลือกตั้งครั้งหน้าได้':'แมลงวันเลือก'+picked.name+' พร้อมขอให้รับรองสิทธิ์เกาะผลไม้';
+    renderTrace(options);
+    lastResult={engine:'mock-rules-v1',brain_loaded:false,jev_called:false,choice,selected_name:picked?.name||null,state_profile:context.key,decision_basis:basis,scores:Object.fromEntries(options.map(o=>[o.key,o.score])),scores_are_probabilities:false};
+    el('fc-json-output').textContent=JSON.stringify(lastResult,null,2);
+    if(!initial)remember();
+  }
+  el('fc-form').addEventListener('submit',event=>{event.preventDefault();run();});
+  el('fc-persona').addEventListener('change',()=>{const p=presets[el('fc-persona').value];if(p)el('fc-state').value=p.text;updateStateHint();stale();remember();});
+  fields.forEach(id=>{el(id).addEventListener('input',()=>{if(id==='fc-state'){el('fc-persona').value='custom';updateStateHint();}stale();});el(id).addEventListener('change',remember);});
+  root.querySelectorAll('summary').forEach(summary=>summary.addEventListener('click',()=>setTimeout(remember,0)));
+  restore(window.openai?.widgetState);updateStateHint();run(true);
+  window.addEventListener('openai:set_globals',event=>{const snapshot=event.detail?.globals?.widgetState;if(snapshot?.modelContent?.prototype==='fly-choice-text-mock'){restore(snapshot);run(true);}});
+  const appearance={radius:16,compact:false};
+  function renderAppearance(){root.style.setProperty('--fc-radius',appearance.radius+'px');root.style.setProperty('--fc-gap',appearance.compact?'16px':'24px');}
+  if(globalThis.Tweak){const tweak=new Tweak({container:root,onChange:renderAppearance});tweak.addSlider(appearance,'radius',{label:'มุมของช่องนโยบาย',min:0,max:24,unit:'px'});tweak.addToggle(appearance,'compact',{label:'ระยะห่างแบบกระชับ'});}
+})();
+</script>

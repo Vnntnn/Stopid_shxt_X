@@ -1,0 +1,17 @@
+{
+  "model_name": "flyneuron-jev-old-newmix",
+  "max_len": 1024,
+  "head_max_len": 256,
+  "head_layers": 2,
+  "n_act": 2,
+  "head_dim": 576,
+  "teacher": null,
+  "base_checkpoint": "../opd/base_v1.pt",
+  "data": "mix",
+  "temperature": [
+    1.0,
+    1.0,
+    1.0
+  ],
+  "calibration_note": "These are the temperatures embedded in On-Fly-Jev.pt and the ones every reported number used (T=1.0, no per-bucket temperatures). DecisionAgent reads them from the .pt; this file mirrors them."
+}

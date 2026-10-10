@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fly brain election</title>
+<title>เลือกพรรคด้วยสมองแมลงวัน</title>
 <style>
 :root{
   --bg:#f3f4f6; --card:#fff; --ink:#111827; --muted:#6b7280; --line:#e5e7eb;
@@ -29,7 +29,7 @@ section{background:var(--card);border-radius:16px;box-shadow:0 1px 3px rgba(0,0,
 .pill.green{background:var(--green-bg);color:var(--green)}
 .pill.red{background:var(--red-bg);color:var(--red)}
 .pill.amber{background:var(--amber-bg);color:var(--amber)}
-.pill.grey,.pill.unaffected{background:var(--grey-bg);color:var(--muted)}
+.pill.grey,.pill.ไม่กระทบ{background:var(--grey-bg);color:var(--muted)}
 .tbl{overflow-x:auto}
 table{border-collapse:collapse;width:100%;table-layout:fixed;font-size:14px}
 th,td{text-align:left;vertical-align:top;padding:8px 10px;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
@@ -80,219 +80,335 @@ tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-
   section{padding:16px}
   .bar{grid-template-columns:90px 1fr 44px}
 }
+:root{--bg:#f5f6f2;--ink:#183b39;--muted:#617471;--line:#dfe6df;--blue:#6b4cb0;--blue-bg:#f0eafa;--green:#127864;--green-bg:#e9f6ee}
+html{scroll-behavior:smooth;scroll-padding-top:28px}
+body{font-family:"Thonburi","Leelawadee UI","Noto Sans Thai",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.75;background:radial-gradient(#b8c7bf44 .6px,transparent .6px) 0 0/16px 16px,var(--bg)}
+.wrap{max-width:1480px;padding:40px 32px;gap:34px}
+nav.toc{width:166px;top:30px;font-size:12px;border-left:1px solid var(--line);padding-left:20px}
+nav.toc .part{font-size:12px;margin-top:22px}
+nav.toc a{padding:5px 0;line-height:1.55}nav.toc a:hover{color:var(--green)}
+h1,h2,h3{letter-spacing:-.025em}h2{font-size:22px;line-height:1.55}
+section{padding:28px;border:1px solid var(--line);box-shadow:0 5px 24px #183b3904;margin:24px 0;border-radius:20px}
+section[id],h2[id]{scroll-margin-top:24px}
+.hero{padding:10px 4px 18px;position:relative}
+.eyebrow{font-size:11px;color:var(--muted);letter-spacing:.08em;font-weight:600;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+.status-dot{width:7px;height:7px;border-radius:50%;background:#188674;box-shadow:0 0 0 4px #18867414}
+h1{font-size:clamp(32px,3.3vw,48px);line-height:1.4;margin:12px 0 16px;font-weight:750}h1 span{color:#2a8b74}
+.hero-lead{font-size:17px;color:var(--muted);margin:0 0 26px}
+.hero-bottom{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.hero-tags{display:flex;flex-wrap:wrap;gap:8px}.hero-tags span{background:#fff;border:1px solid var(--line);padding:5px 12px;border-radius:100px;font-size:12px}
+button{font:inherit}#toggle-details{background:transparent;border:1px solid #bbcfc5;color:var(--ink);border-radius:9px;padding:7px 12px;cursor:pointer;font-size:12px}#toggle-details:hover{background:#e9f1ea}#toggle-details span{margin-left:12px}
+a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #9c7cd4;outline-offset:4px}
+.section-top{display:flex;justify-content:space-between;align-items:center;gap:12px}.section-top h2{margin:0}.section-top .eyebrow{margin-bottom:4px}
+.diagram-badge{font-size:11px;color:#617471;background:#f0f4ee;border-radius:6px;padding:5px 9px;white-space:nowrap}
+.pipeline{list-style:none;padding:0;margin:26px 0 20px;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:22px}
+.stage{border:1px solid var(--line);border-radius:13px;background:#fff;padding:14px 12px 12px;position:relative;display:flex;flex-direction:column;min-height:300px;min-width:0;font-size:12px}
+.stage:not(:last-child):after{content:"→";position:absolute;left:100%;top:48%;width:22px;text-align:center;color:#8b9d96;font-size:20px;font-family:Arial,sans-serif}
+.stage-number{font:600 11px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);display:flex;justify-content:space-between;gap:6px}.stage-number span{font:11px/1.5 "Thonburi",sans-serif}
+.stage h3{font-size:16px;line-height:1.5;margin:8px 0 6px}.stage p{color:var(--muted);font-size:12px;margin:0 0 16px}.stage>code{font-size:10px;line-height:1.6;display:block;margin-top:10px;overflow-wrap:anywhere}
+.stage-icon{width:38px;height:38px;color:#617471;margin-top:16px}.stage-icon svg{width:100%;height:100%;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.llm-stage{background:#fcfaff;border-color:#e1d5f1}.llm-stage .stage-icon{color:#8967ba}.taste-stage{background:#fcfcf7}.brain-stage{background:#edf7f1;border-color:#bbddcb}.output-stage{background:#f4f8f5;border-color:#c7ddd0}
+.node-detail{font-size:11px;line-height:1.7;color:var(--muted);margin-top:auto;padding-top:10px;border-top:1px dashed var(--line)}
+.taste{border-radius:8px;padding:8px 7px;margin:7px 0 0}.taste span,.taste small{display:block;font-size:10px;line-height:1.8}.taste code{font-size:9px}.taste strong{display:block;font:600 15px/1.9 ui-monospace,Menlo,monospace;white-space:nowrap;letter-spacing:-.05em}.taste b{font-weight:400;opacity:.5}.sweet{background:#e8f4e9;color:#2a754d}.bitter{background:#faf0dc;color:#9a6a20}
+.brain-network{width:100%;height:69px;color:#28856b;margin:10px 0 0}
+.diagram-foot{display:grid;grid-template-columns:1fr 1fr;gap:20px;background:#f6f8f4;border:1px solid var(--line);border-radius:12px;padding:16px 18px}.diagram-foot>div{display:grid;grid-template-columns:auto 1fr;gap:0 15px}.diagram-foot strong{font:600 28px/1.5 ui-monospace,Menlo,monospace;grid-row:2}.diagram-foot span:last-child{font-size:11px;align-self:center;grid-row:2;color:var(--muted)}.foot-label{font-size:10px;grid-column:1/-1;color:var(--muted)}
+.insight{display:flex;gap:12px;margin-top:18px;font-size:12px;line-height:1.8}.insight>span{color:#2a8b74;font-size:24px}.insight p{margin:0;color:var(--muted)}.insight strong{color:var(--ink)}
+.architecture{margin:22px 0}.orchestrator{text-align:center;border:1px solid #bdcfc5;background:#f1f6ef;border-radius:12px;padding:16px}.module-label{color:var(--muted);font-size:11px;display:block;margin-bottom:5px}.architecture h3{margin:4px 0;font-size:15px}.architecture p{font-size:12px;margin:6px 0;color:var(--muted)}.architecture code{font-size:12px;overflow-wrap:anywhere}
+.arch-branches{display:grid;grid-template-columns:1fr 1fr;text-align:center;font-size:11px;color:var(--muted);padding:9px}.arch-modules{display:grid;grid-template-columns:1fr 1fr;gap:18px}.module-card{border:1px solid var(--line);border-radius:12px;padding:16px}.module-card.violet{border-color:#e0d7ef;background:#fcfaff}.module-card.teal{background:#f1f8f3;border-color:#c8dfcf}.module-output{font-size:11px;margin-top:10px;border-top:1px dashed var(--line);padding-top:10px}.arch-supports{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px;margin-left:25%;position:relative}.arch-supports:before{content:"";height:8px;position:absolute;left:50%;bottom:100%;border-left:1px solid #adc2b6}.support-card{padding:12px;border:1px dashed #c6d5ca;border-radius:9px;background:#fafcf9;min-width:0}.support-card>span{display:block;font-size:10px;color:var(--muted);margin-bottom:8px}.support-card>code{font-size:11px}.support-card p{font-size:11px}
+.cache-flow{display:grid;grid-template-columns:1fr auto 1.5fr;align-items:center;gap:18px;border:1px solid var(--line);border-radius:12px;padding:16px;background:#fcfcf9}.cache-flow>div>code{font-size:11px;overflow-wrap:anywhere}.cache-question{font-size:12px;border:1px solid #d8e2d7;border-radius:100px;padding:8px 12px;background:#f1f6ec;white-space:nowrap}.cache-paths p{font-size:11px;margin:3px 0}.cache-paths code{font-size:10px}.cache-yes,.cache-no{display:inline-block;min-width:37px;font-size:10px;margin-right:7px;border-radius:4px;text-align:center}.cache-yes{background:#e6f3e9;color:#317547}.cache-no{background:#fcf0da;color:#946b29}
+.frame{background:#fafbf8}.frame h4{text-transform:none;letter-spacing:0}.bar{grid-template-columns:80px 1fr 46px}.bar i{height:12px;background:#aec9bc}.bar.win i{background:#27856b}table{font-size:13px}th{font-size:11px;text-transform:none;letter-spacing:0}.cols h4{text-transform:none}.task{background:#fcfdfb;padding:20px}.task>h3{font-size:17px}.task>p{font-size:13px;color:var(--muted)}.task li{font-size:13px}.tag{font-size:10px}.diff{font-size:11.5px;line-height:1.6}.diff .note{font-family:"Thonburi",sans-serif;font-size:11px}.diff .hd{font-size:11px}.diff .hd span:last-child{white-space:normal}details{padding:10px 0}summary{font-size:13px;color:#287962}.divider{letter-spacing:0;text-transform:none;margin:34px 0 12px}.dep-note{font-size:12px;color:var(--muted);margin:12px 0}
+.task-graph{display:grid;grid-template-columns:1fr 80px 1fr;align-items:center;gap:16px;margin:20px 0}.parallel-tasks{display:grid;gap:10px}.task-node{display:block;text-decoration:none;border:1px solid #c4ddcd;background:#eff7ef;border-radius:10px;padding:12px 16px;color:var(--ink);font-size:13px}.task-node small{display:block;font-size:11px;color:var(--muted)}.task-node:hover{border-color:#2a8b74}.task-join{text-align:center;font-size:11px;color:var(--muted)}.task-join b{display:block;font-size:28px;font-weight:400;color:#90a397}.notebook-task{background:#f0eefa;border-color:#d9ceeb}
+@media(max-width:1200px){.wrap{padding:30px 20px;gap:24px}nav.toc{width:144px;padding-left:14px}.pipeline{gap:16px}.stage:not(:last-child):after{width:16px;font-size:16px}.stage{padding:12px 9px}.taste strong{font-size:13px}section{padding:22px}}
+@media(max-width:1024px){.wrap{max-width:1060px}.pipeline{gap:18px}.stage{padding:14px 12px}.stage:not(:last-child):after{width:18px}.taste strong{font-size:14px}}
+@media(max-width:800px){.wrap{padding:22px 16px}.pipeline{grid-template-columns:1fr;margin:20px 0;gap:25px}.stage{min-height:0;display:grid;grid-template-columns:48px 1fr;gap:0 14px;padding:16px}.stage-number{grid-column:1/-1}.stage h3,.stage p,.stage .node-detail,.stage>code{grid-column:2}.stage h3{grid-row:2;margin-top:8px}.stage-icon{grid-column:1;grid-row:2/5;align-self:center;margin:0}.stage p{margin:0 0 10px}.stage .node-detail{margin-top:0}.stage:not(:last-child):after{content:"↓";left:50%;top:100%;transform:translateX(-50%);height:25px;line-height:25px;width:24px}.taste-stage .taste{grid-column:2}.taste-stage h3{grid-row:auto}.taste-stage .node-detail{margin-top:10px}.brain-network{grid-column:1;grid-row:2/5;height:65px}.stage>code{font-size:11px}.section-top{align-items:flex-start;flex-wrap:wrap}.diagram-foot{grid-template-columns:1fr;gap:16px}.diagram-foot>div+div{border-top:1px solid var(--line);padding-top:12px}.architecture h3 code{font-size:12px}.arch-supports{margin-left:0}.cache-flow{grid-template-columns:1fr}.cache-question{justify-self:start}.cache-paths p{line-height:2}.hero-lead{font-size:15px}.diff{font-size:10px}}
+@media(max-width:540px){section{padding:18px 16px;border-radius:16px}.wrap{padding:18px 12px}h2{font-size:19px}.arch-modules,.arch-branches{grid-template-columns:1fr}.arch-branches span+span{display:none}.module-card+.module-card:before{content:"↓ จากโน้ตบุ๊ก: จำลองและคำนวณคะแนน";display:block;font-size:11px;color:var(--muted);margin-bottom:10px}.arch-supports{grid-template-columns:1fr}.hero-bottom{gap:16px}.hero-tags span{font-size:11px;padding:4px 9px}.task-graph{grid-template-columns:1fr;gap:8px}.task-join b{transform:rotate(90deg);line-height:1.2}.task-join{padding:5px}.task{padding:16px}.tbl table{min-width:580px}.diagram-badge{white-space:normal}h1{font-size:33px}.pair,.cols{grid-template-columns:1fr}.diagram-foot span:last-child{font-size:10px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{body{background:#fff}.wrap{display:block;padding:0}nav.toc,#toggle-details{display:none}.hero{padding:0}h1{font-size:30px}section,.task{break-inside:avoid;box-shadow:none}.pipeline{grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}.stage{display:flex;min-height:300px;padding:9px}.stage:not(:last-child):after{content:"→";left:100%;top:48%;transform:none;width:12px;font-size:12px}.stage>code{font-size:9px}.stage h3{font-size:14px}.taste strong{font-size:12px}.diagram-foot{grid-template-columns:1fr 1fr}.arch-modules,.arch-branches{grid-template-columns:1fr 1fr}.arch-supports{grid-template-columns:repeat(3,minmax(0,1fr))}.tbl table{min-width:0}.hero-tags span{font-size:10px}*{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+
+.rate-note{border:1px solid #dbdfcd;background:#fafbf3;border-radius:10px;padding:10px 14px;margin:0 0 18px}.rate-note summary{font-size:12px;color:#63713f}.rate-explanation{font-size:12px;color:var(--muted);line-height:1.9}.rate-explanation code{font-size:11px}.rate-explanation a{color:#287962}
 </style>
 </head>
 <body>
 <div class="wrap">
 <nav class="toc">
-  <div class="part">Overview</div>
-  <a href="#goal">Goal</a>
-  <a href="#current-problems">Today</a>
-  <a href="#proposed-approach">After</a>
-  <a href="#comparison">Side by side</a>
-  <div class="part">Implementation</div>
-  <a href="#acceptance-criteria">Acceptance criteria</a>
-  <a href="#rollout-risk">Rollout risk</a>
-  <a href="#file-map">File map</a>
-  <a href="#blast-radius">Blast radius</a>
-  <a href="#tasks">Tasks</a>
-  <a href="#test-strategy">Tests</a>
-  <a href="#open-questions">Open questions</a>
+  <div class="part">ไดอะแกรม</div>
+  <a href="#diagram">ขั้นตอนการทำงาน</a>
+  <a href="#system-map">โมดูลและแคช</a>
+  <div class="part">ภาพรวม</div>
+  <a href="#goal">เป้าหมาย</a>
+  <a href="#current-problems">ก่อนพัฒนา</a>
+  <a href="#proposed-approach">หลังพัฒนา</a>
+  <a href="#comparison">เปรียบเทียบก่อนและหลัง</a>
+  <div class="part">แผนพัฒนา</div>
+  <a href="#acceptance-criteria">เกณฑ์ตรวจรับ</a>
+  <a href="#rollout-risk">ความเสี่ยงเมื่อนำไปใช้</a>
+  <a href="#file-map">แผนผังไฟล์</a>
+  <a href="#blast-radius">ขอบเขตผลกระทบ</a>
+  <a href="#tasks">งานที่ต้องทำ</a>
+  <a href="#test-strategy">การทดสอบ</a>
+  <a href="#open-questions">ประเด็นที่ยังต้องตรวจสอบ</a>
 </nav>
 <main>
 
-<h1>Fly brain election</h1>
-<p class="summary">9 files · +8 new · ~1 changed</p>
+<header class="hero">
+  <div class="eyebrow"><span class="status-dot"></span> ไอเดียแฮกกาธอน · แผนเดโม 12 ชั่วโมง</div>
+  <h1>ให้สมองแมลงวัน<br><span>ลองเลือกพรรคการเมือง</span></h1>
+  <p class="hero-lead">จากคำอธิบายนโยบาย สู่รสหวานและรสขม<br>ผ่านสมองจำลอง แล้วอ่านออกมาเป็นคะแนนโหวต</p>
+  <div class="hero-bottom"><div class="hero-tags"><span>1 โน้ตบุ๊ก</span><span>3 โมดูลหลัก</span><span>N พรรค → N ความน่าจะเป็น</span></div><button type="button" id="toggle-details" aria-expanded="false">เปิดรายละเอียดทั้งหมด <span aria-hidden="true">＋</span></button></div>
+</header>
+
+<section id="diagram" class="diagram-section" aria-labelledby="diagram-title">
+  <div class="section-top"><div><p class="eyebrow">01 / การไหลของข้อมูล</p><h2 id="diagram-title">ข้อความเข้า → ความน่าจะเป็นออก</h2></div><span class="diagram-badge">ทำขั้นตอน 1–4 ทีละพรรค</span></div>
+  <p class="muted">ค่าตัวเลขด้านล่างเป็นตัวอย่างจากกติกาแปลงคะแนนที่แผนเดโมกำหนด</p>
+  <ol class="pipeline" aria-label="ขั้นตอนการประมวลผลจากคำอธิบายพรรคถึงความน่าจะเป็น">
+    <li class="stage input-stage">
+      <div class="stage-number">01 <span>ข้อมูลเข้า</span></div>
+      <div class="stage-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><rect x="10" y="5" width="22" height="30" rx="4"/><path d="M15 13h12M15 19h12M15 25h7"/></svg></div>
+      <h3>คำอธิบายพรรค</h3><p>ทีมพิมพ์นโยบาย<br>ด้วยภาษาของตัวเอง</p>
+      <div class="node-detail">ข้อความอิสระ<br>ในเซลล์โน้ตบุ๊ก</div><code>PARTIES</code>
+    </li>
+    <li class="stage llm-stage">
+      <div class="stage-number">02 <span>ตีความ</span></div>
+      <div class="stage-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M20 5l4 11 11 4-11 4-4 11-4-11-11-4 11-4z"/></svg></div>
+      <h3>Claude</h3><p>แปลงนโยบาย<br>เป็นคะแนนรสชาติ</p>
+      <div class="node-detail">ตรวจช่วงค่า 0–1<br>พร้อมเหตุผลหนึ่งบรรทัด</div><code>traits.score_party()</code>
+    </li>
+    <li class="stage taste-stage">
+      <div class="stage-number">03 <span>สร้างสิ่งเร้า</span></div>
+      <h3>หวาน + ขม</h3>
+      <div class="taste sweet"><span>ความดึงดูด <code>appeal</code></span><strong>0.8 <b>→</b> 160 Hz</strong><small>เซลล์รับรสหวาน 21 เซลล์</small></div>
+      <div class="taste bitter"><span>ความไม่ชอบ <code>aversion</code></span><strong>0.3 <b>→</b> 60 Hz</strong><small>เซลล์รับรสขม 21 เซลล์</small></div>
+      <div class="node-detail">กติกาเดโม: คะแนน × 200<br>ปัดเป็นช่วงละ 20 Hz</div><code>brain.quantize_hz()</code>
+    </li>
+    <li class="stage brain-stage">
+      <div class="stage-number">04 <span>จำลองสมอง</span></div>
+      <svg class="brain-network" viewBox="0 0 160 90" role="img" aria-label="ภาพสัญลักษณ์โครงข่ายประสาทแมลงวัน">
+        <g fill="none" stroke="currentColor" stroke-width="1.3" opacity=".55"><path d="M18 45L45 18 77 33 110 15 140 41 111 72 77 57 45 76 18 45M18 45L77 33 111 72M45 18L77 57 140 41M45 76L77 33 110 15M77 33L77 57M18 45L140 41"/></g>
+        <g fill="currentColor"><circle cx="18" cy="45" r="4"/><circle cx="45" cy="18" r="5"/><circle cx="45" cy="76" r="5"/><circle cx="77" cy="33" r="6"/><circle cx="77" cy="57" r="4"/><circle cx="110" cy="15" r="4"/><circle cx="111" cy="72" r="5"/><circle cx="140" cy="41" r="6"/></g>
+      </svg>
+      <h3>สมองแมลงวัน</h3><p>แบบจำลองทั้งสมอง<br>ใช้โครงข่าย FlyWire</p>
+      <div class="node-detail">Shiu และคณะ (2024)<br>บันทึกสัญญาณเป็น parquet</div><code>brain.run_party()</code>
+    </li>
+    <li class="stage output-stage">
+      <div class="stage-number">05 <span>สรุปทุกพรรค</span></div>
+      <div class="stage-icon" aria-hidden="true"><svg viewBox="0 0 40 40"><path d="M8 5v29h27M13 11h18M13 20h13M13 29h8"/></svg></div>
+      <h3>ผลการโหวต</h3><p>นับอัตรา MN9 เป็นคะแนน<br>แล้วรวมทุกพรรคด้วย softmax</p>
+      <div class="node-detail">ตารางคะแนน<br>+ กราฟความน่าจะเป็น</div><code>brain.elect()</code>
+    </li>
+  </ol>
+  <details class="rate-note">
+    <summary>160 Hz และ 60 Hz มาจากไหน?</summary>
+    <div class="rate-explanation">
+      <p>แผนเดโมกำหนดสูตร <code>Hz = round(คะแนน × 200 / 20) × 20</code> จึงได้ <code>0.8 → 160 Hz</code> และ <code>0.3 → 60 Hz</code> คะแนน 0.8 และ 0.3 เป็นตัวอย่าง ส่วนเพดาน 200 Hz และช่วงปัดค่า 20 Hz เป็นค่าที่แผนเลือก ยังไม่มีการสอบเทียบคะแนนข้อความกับข้อมูลการตอบสนองต่อรสชาติจริง</p>
+      <p>Hz ในขั้นตอนนี้หมายถึงอัตราเฉลี่ยของสัญญาณกระตุ้นแบบ Poisson ที่ป้อนเข้ากลุ่มเซลล์ประสาท ไม่ใช่หน่วยวัดความหวานหรือความขม และไม่ใช่อัตรา MN9 ที่อ่านออกมาหลังจำลอง โมเดลต้นทางเปิดให้กำหนดอัตราอินพุตสองกลุ่มผ่าน <code>r_poi</code> และ <code>r_poi2</code> โดยค่าเริ่มต้นในโค้ดคือ 150 Hz และ 0 Hz ตามลำดับ</p>
+      <p class="muted">อ้างอิง: <a href="https://github.com/philshiu/Drosophila_brain_model/blob/main/model.py#L33-L36" target="_blank" rel="noopener noreferrer">พารามิเตอร์อินพุตของโมเดลต้นทาง</a> · <a href="https://github.com/philshiu/Drosophila_brain_model#usage" target="_blank" rel="noopener noreferrer">วิธีกำหนดความถี่กระตุ้น</a></p>
+    </div>
+  </details>
+  <div class="diagram-foot"><div><span class="foot-label">สัญญาณที่ใช้โหวต</span><strong>MN9</strong><span>เซลล์ประสาทสั่งการงวง · อัตราส่งสัญญาณ (Hz)</span></div><div><span class="foot-label">ผลรวมทุกพรรค</span><strong>100%</strong><span>softmax เปลี่ยนคะแนนเป็นความน่าจะเป็น</span></div></div>
+  <aside class="insight"><span aria-hidden="true">↳</span><p><strong>จุดที่ควรเห็นในเดโม:</strong> แสดง <code>appeal</code>, <code>aversion</code> และเหตุผลของ Claude ด้วย เพราะการแปลงข้อความเป็นรสชาติเป็นจุดอ่อนหลักของวิธีนี้</p></aside>
+</section>
+
+<section id="system-map" class="diagram-section" aria-labelledby="system-title">
+  <div class="section-top"><div><p class="eyebrow">02 / ส่วนประกอบระบบ</p><h2 id="system-title">โน้ตบุ๊กหนึ่งไฟล์ เชื่อมทุกขั้นตอน</h2></div><span class="diagram-badge">แผนผังโมดูลและแคช</span></div>
+  <div class="architecture">
+    <div class="orchestrator"><span class="module-label">จุดเริ่มต้นของเดโม</span><h3><code>fly_election.ipynb</code></h3><p>กรอกพรรค → ดูคุณลักษณะ → รันการจำลอง → แสดงผล</p></div>
+    <div class="arch-branches" aria-hidden="true"><span>↓ แปลงข้อความ</span><span>↓ จำลองและคำนวณคะแนน</span></div>
+    <div class="arch-modules">
+      <article class="module-card violet"><span class="module-label">ข้อความ → คุณลักษณะ</span><h3><code>flyvote/traits.py</code></h3><p>เรียก Claude และตรวจข้อมูลด้วย Pydantic</p><div class="module-output"><code>appeal</code> + <code>aversion</code> + <code>reason</code></div></article>
+      <article class="module-card teal"><span class="module-label">คุณลักษณะ → คะแนน → ความน่าจะเป็น</span><h3><code>flyvote/brain.py</code></h3><p>ปัดค่า Hz · เรียกโมเดล · นับ MN9 · คำนวณ softmax</p><div class="module-output"><code>run_party()</code> → <code>elect()</code></div></article>
+    </div>
+    <div class="arch-supports"><div class="support-card"><span>↓ ระบุเซลล์ที่จะกระตุ้น</span><code>flyvote/neurons.py</code><p>SUGAR · BITTER · MN9_LEFT</p></div><div class="support-card"><span>↓ เรียกแบบจำลองต้นทาง</span><code>vendor/Drosophila_brain_model</code><p><code>run_exp()</code> + ข้อมูลโครงข่ายรุ่น 783</p></div><div class="support-card"><span>↓ อ่าน / บันทึกผลการจำลอง</span><code>results/*.parquet</code><p>ใช้ผลเดิมซ้ำเมื่อคู่ Hz และจำนวนรอบตรงกัน</p></div></div>
+  </div>
+  <div class="cache-flow"><div><span class="module-label">ตรวจแคชก่อนจำลอง</span><code>s{s}_b{b}_n{n_run}.parquet</code></div><span class="cache-question">มีไฟล์แล้ว?</span><div class="cache-paths"><p><span class="cache-yes">มี</span> อ่านไฟล์ → นับ MN9 → ส่งคืนคะแนน</p><p><span class="cache-no">ไม่มี</span> สร้าง <code>results/</code> → จำลอง → บันทึก → นับ MN9</p></div></div>
+</section>
+<div class="divider">รายละเอียดแผนเดิม · ฉบับภาษาไทย</div>
 <details>
-  <summary>Why</summary>
-  <blockquote>this repo is blank the idea is we want to run a flyfruit brain that opensourceed and we are in a jackathon so we will use it to elect the leader in thailand the rest of the idea is vague please exmine it and talk to me</blockquote>
-  <p class="muted">Answers to the planning questions: demo is a Jupyter notebook; candidates are real Thai parties; input is free text through an LLM; output is a probability per choice, like jev.ai; 12 hours; do not bloat.</p>
+  <summary>ที่มาของไอเดีย</summary>
+  <blockquote>รีโปนี้ยังว่างอยู่ ไอเดียคืออยากรันแบบจำลองสมองแมลงวันผลไม้ที่เปิดเป็นโอเพนซอร์ส เรากำลังร่วมแฮกกาธอน เลยอยากใช้มันเลือกผู้นำประเทศไทย รายละเอียดที่เหลือยังไม่ชัด ช่วยตรวจสอบไอเดียแล้วมาคุยกัน</blockquote>
+  <p class="muted">ข้อสรุปจากการวางแผน: เดโมใช้ Jupyter notebook; ตัวเลือกคือพรรคการเมืองไทยจริง; รับข้อความอิสระผ่าน LLM; แสดงความน่าจะเป็นของแต่ละตัวเลือกแบบ jev.ai; มีเวลา 12 ชั่วโมง; ทำให้กระชับ</p>
 </details>
 
 <section id="goal">
-  <h2>Goal</h2>
-  <p>A notebook where a teammate types a free-text description of each Thai party, and a simulated fruit-fly brain returns a probability for each party. Claude turns the text into two taste signals, the published whole-brain model (Shiu et al. 2024, FlyWire connectome) simulates the response, and the proboscis motor neuron MN9 is the vote.</p>
+  <h2>เป้าหมาย</h2>
+  <p>สร้างโน้ตบุ๊กให้เพื่อนร่วมทีมพิมพ์คำอธิบายพรรคการเมืองไทยด้วยภาษาของตัวเอง แล้วให้สมองแมลงวันผลไม้จำลองส่งคืนความน่าจะเป็นของแต่ละพรรค โดย Claude แปลงข้อความเป็นสัญญาณรสชาติสองชนิด แบบจำลองสมองทั้งระบบที่เผยแพร่ในงาน Shiu และคณะ (2024) ซึ่งใช้แผนผังการเชื่อมต่อประสาท FlyWire จะจำลองการตอบสนอง และใช้เซลล์ประสาทสั่งการงวง MN9 เป็นคะแนนโหวต</p>
 </section>
 
 <section id="current-problems">
-  <h2>What the user sees today</h2>
-  <p><span class="pill grey">0 cells · 0 lines</span> The repo holds one 15-byte README. Every step between "party" and "ranking" is missing.</p>
+  <h2>ก่อนเริ่มพัฒนา</h2>
+  <p><span class="pill grey">0 เซลล์ · 0 บรรทัด</span> ณ ตอนวางแผน รีโปมีเพียง README ขนาด 15 ไบต์ ยังไม่มีขั้นตอนเชื่อมจาก “พรรค” ไปสู่ “การจัดอันดับ”</p>
   <div class="frame">
-    <h4>Today</h4>
+    <h4>ก่อนพัฒนา</h4>
     <div class="flow">
-      <div class="box dim">Party description (in someone's head)</div>
-      <div class="arrow">↓ no code</div>
-      <div class="box dim">Stimulus pattern (which neurons, what Hz)</div>
-      <div class="arrow">↓ no code</div>
-      <div class="box ext">Fly brain model <code>run_exp(...)</code></div>
-      <div class="arrow">↓ no code</div>
-      <div class="box dim">Spike parquet files</div>
-      <div class="arrow">↓ no code</div>
-      <div class="box dim">Ranking</div>
+      <div class="box dim">คำอธิบายพรรค (ยังเป็นแค่ไอเดีย)</div>
+      <div class="arrow">↓ ยังไม่มีโค้ด</div>
+      <div class="box dim">รูปแบบสิ่งเร้า (กระตุ้นเซลล์ไหน ด้วยความถี่เท่าไร)</div>
+      <div class="arrow">↓ ยังไม่มีโค้ด</div>
+      <div class="box ext">แบบจำลองสมองแมลงวัน <code>run_exp(...)</code></div>
+      <div class="arrow">↓ ยังไม่มีโค้ด</div>
+      <div class="box dim">ไฟล์ parquet ของสัญญาณประสาท</div>
+      <div class="arrow">↓ ยังไม่มีโค้ด</div>
+      <div class="box dim">การจัดอันดับ</div>
     </div>
   </div>
 </section>
 
 <section id="proposed-approach">
-  <h2>What the user will see</h2>
-  <p><span class="pill green">1 notebook · 3 modules · N parties → N probabilities</span> The notebook runs top to bottom. Each party's text becomes an <code>appeal</code> and an <code>aversion</code> score in 0–1. Appeal drives the 21 sugar-sensing neurons, aversion drives the 21 bitter-sensing neurons, both as rates up to 200 Hz. One simulation per party. MN9's firing rate is the party's score, and a softmax over scores gives the probabilities.</p>
+  <h2>หลังพัฒนาเสร็จ</h2>
+  <p><span class="pill green">1 โน้ตบุ๊ก · 3 โมดูล · N พรรค → N ค่าความน่าจะเป็น</span> รันโน้ตบุ๊กจากบนลงล่าง ข้อความของแต่ละพรรคจะถูกแปลงเป็นคะแนนความดึงดูด (<code>appeal</code>) และความไม่ชอบ (<code>aversion</code>) ในช่วง 0–1 ความดึงดูดกระตุ้นเซลล์ประสาทรับรสหวาน 21 เซลล์ ส่วนความไม่ชอบกระตุ้นเซลล์รับรสขม 21 เซลล์ ด้วยอัตราสูงสุด 200 Hz ตามกติกาเดโม จำลองหนึ่งชุดต่อพรรค ใช้อัตราการส่งสัญญาณของ MN9 เป็นคะแนน แล้วใช้ softmax แปลงคะแนนทุกพรรคเป็นความน่าจะเป็น</p>
   <div class="frame">
-    <h4>After</h4>
+    <h4>หลังพัฒนา</h4>
     <div class="flow">
-      <div class="box">Party description, typed in a notebook cell</div>
-      <div class="arrow">↓ <code>traits.score_party()</code> · Claude, structured output</div>
-      <div class="box new">appeal = 0.8 · aversion = 0.3 · one-line reason</div>
-      <div class="arrow">↓ <code>brain.run_party()</code> · sugar 160 Hz, bitter 60 Hz</div>
-      <div class="box ext">Fly brain model <code>run_exp(neu_exc=SUGAR, neu_exc2=BITTER)</code></div>
-      <div class="arrow">↓ MN9 rate from the parquet</div>
-      <div class="box new">score = 42 Hz</div>
-      <div class="arrow">↓ <code>brain.elect()</code> · softmax over parties</div>
-      <div class="box new">Probability bar chart</div>
+      <div class="box">พิมพ์คำอธิบายพรรคในเซลล์โน้ตบุ๊ก</div>
+      <div class="arrow">↓ <code>traits.score_party()</code> · ผลลัพธ์แบบมีโครงสร้างจาก Claude</div>
+      <div class="box new">ความดึงดูด = 0.8 · ความไม่ชอบ = 0.3 · เหตุผลหนึ่งบรรทัด</div>
+      <div class="arrow">↓ <code>brain.run_party()</code> · รสหวาน 160 Hz, รสขม 60 Hz</div>
+      <div class="box ext">แบบจำลองสมองแมลงวัน <code>run_exp(neu_exc=SUGAR, neu_exc2=BITTER)</code></div>
+      <div class="arrow">↓ อ่านอัตรา MN9 จาก parquet</div>
+      <div class="box new">คะแนน = 42 Hz</div>
+      <div class="arrow">↓ <code>brain.elect()</code> · softmax รวมคะแนนทุกพรรค</div>
+      <div class="box new">กราฟแท่งแสดงความน่าจะเป็น</div>
     </div>
   </div>
 </section>
 
 <section id="comparison">
-  <h2>Side by side</h2>
+  <h2>เปรียบเทียบก่อนและหลัง</h2>
   <div class="pair">
     <div class="frame">
-      <h4>Today — notebook output</h4>
-      <div class="muted">Nothing. No notebook exists.</div>
+      <h4>ก่อนพัฒนา — ผลลัพธ์โน้ตบุ๊ก</h4>
+      <div class="muted">ยังไม่มีผลลัพธ์ เพราะยังไม่มีโน้ตบุ๊ก</div>
     </div>
     <div class="frame">
-      <h4>After — last cell</h4>
+      <h4>หลังพัฒนา — เซลล์สุดท้าย (ตัวอย่าง)</h4>
       <div class="bars">
-        <div class="bar win"><span>Party A</span><i style="width:62%"></i><span>41%</span></div>
-        <div class="bar"><span>Party B</span><i style="width:40%"></i><span>27%</span></div>
-        <div class="bar"><span>Party C</span><i style="width:28%"></i><span>19%</span></div>
-        <div class="bar"><span>Party D</span><i style="width:20%"></i><span>13%</span></div>
+        <div class="bar win"><span>พรรค ก</span><i style="width:41%"></i><span>41%</span></div>
+        <div class="bar"><span>พรรค ข</span><i style="width:27%"></i><span>27%</span></div>
+        <div class="bar"><span>พรรค ค</span><i style="width:19%"></i><span>19%</span></div>
+        <div class="bar"><span>พรรค ง</span><i style="width:13%"></i><span>13%</span></div>
       </div>
-      <div class="muted" style="margin-top:8px">Plus a table: party, appeal, aversion, MN9 Hz, probability.</div>
+      <div class="muted" style="margin-top:8px">พร้อมตาราง: พรรค ความดึงดูด ความไม่ชอบ อัตรา MN9 (Hz) และความน่าจะเป็น</div>
     </div>
   </div>
-  <p class="muted">Trade-off: the text-to-taste mapping is the whole joke and the whole weakness. The notebook prints the two scores and Claude's one-line reason per party so the audience can see the mapping, not only the result.</p>
+  <p class="muted">ข้อแลกเปลี่ยน: การแปลงข้อความเป็นรสชาติเป็นทั้งมุกหลักและจุดอ่อนหลักของไอเดีย โน้ตบุ๊กจึงแสดงคะแนนทั้งสองค่า พร้อมเหตุผลหนึ่งบรรทัดจาก Claude ของแต่ละพรรค เพื่อให้ผู้ชมเห็นที่มาของคะแนนด้วย</p>
 </section>
 
-<div class="divider">Part B · Implementation</div>
+<div class="divider">ส่วนที่ 2 · แผนพัฒนา</div>
 <section id="implementation-plan">
 
-<h2 id="acceptance-criteria">Acceptance criteria</h2>
+<h2 id="acceptance-criteria">เกณฑ์ตรวจรับ</h2>
 <div class="tbl"><table>
-<thead><tr><th style="width:60px">AC</th><th>When</th><th>Then</th></tr></thead>
+<thead><tr><th style="width:60px">AC</th><th>เมื่อ</th><th>ผลที่ต้องได้</th></tr></thead>
 <tbody>
-<tr><td>AC1</td><td>A teammate follows the README setup and runs <code>pytest</code></td><td>All tests pass.</td></tr>
-<tr><td>AC2</td><td><code>score_party("X", "<i>free text</i>")</code> is called with a valid Anthropic credential</td><td>It returns <code>Traits</code> with <code>appeal</code> and <code>aversion</code> both in [0, 1] and a non-empty <code>reason</code>. An empty description raises <code>ValueError</code> before any API call.</td></tr>
-<tr><td>AC3</td><td><code>run_party(appeal=1.0, aversion=0.0)</code> runs for the first time</td><td>It returns an MN9 rate above 0 Hz and <code>results/s200_b0_n5.parquet</code> exists.</td></tr>
-<tr><td>AC4</td><td><code>run_party(appeal=1.0, aversion=0.0)</code> runs a second time</td><td>It returns the same rate in under 2 s because the parquet is reused.</td></tr>
-<tr><td>AC5</td><td><code>run_party(appeal=0.0, aversion=0.0)</code> runs</td><td>It returns 0.0 and does not raise, even though no neuron spikes.</td></tr>
-<tr><td>AC6</td><td><code>elect()</code> receives N parties with their scores and traits</td><td>It returns N probabilities that sum to 1.0 within 1e-6, the highest score has the highest probability, and equal scores give equal probabilities.</td></tr>
-<tr><td>AC7</td><td>The notebook is run top to bottom with a description filled in for each party</td><td>The last cell shows one horizontal bar per party, labelled with the percentage, and the table above it shows appeal, aversion, MN9 Hz, and probability per party.</td></tr>
+<tr><td>AC1</td><td>เพื่อนร่วมทีมติดตั้งตาม README และรัน <code>pytest</code></td><td>การทดสอบทั้งหมดผ่าน</td></tr>
+<tr><td>AC2</td><td><code>score_party("X", "<i>ข้อความอิสระ</i>")</code> ถูกเรียกด้วยข้อมูลยืนยันตัวตน Anthropic ที่ใช้งานได้</td><td>ส่งคืน <code>Traits</code> ที่มี <code>appeal</code> และ <code>aversion</code> อยู่ในช่วง [0, 1] พร้อม <code>reason</code> ที่ไม่ว่าง หากคำอธิบายว่าง ให้เกิด <code>ValueError</code> ก่อนเรียก API</td></tr>
+<tr><td>AC3</td><td><code>run_party(appeal=1.0, aversion=0.0)</code> รันครั้งแรก</td><td>ส่งคืนอัตรา MN9 มากกว่า 0 Hz และสร้างไฟล์ <code>results/s200_b0_n5.parquet</code></td></tr>
+<tr><td>AC4</td><td><code>run_party(appeal=1.0, aversion=0.0)</code> รันครั้งที่สอง</td><td>ส่งคืนอัตราเดิมภายใน 2 วินาที เพราะใช้ไฟล์ parquet ที่บันทึกไว้ซ้ำ</td></tr>
+<tr><td>AC5</td><td><code>run_party(appeal=0.0, aversion=0.0)</code> รัน</td><td>ส่งคืน 0.0 โดยไม่เกิดข้อผิดพลาด แม้ไม่มีเซลล์ประสาทส่งสัญญาณ</td></tr>
+<tr><td>AC6</td><td><code>elect()</code> รับข้อมูล N พรรค พร้อมคะแนนและคุณลักษณะ</td><td>ส่งคืนความน่าจะเป็น N ค่า ซึ่งรวมเป็น 1.0 โดยคลาดเคลื่อนไม่เกิน 1e-6 คะแนนสูงสุดต้องมีความน่าจะเป็นสูงสุด และคะแนนเท่ากันต้องได้ความน่าจะเป็นเท่ากัน</td></tr>
+<tr><td>AC7</td><td>รันโน้ตบุ๊กจากบนลงล่าง โดยกรอกคำอธิบายของทุกพรรคแล้ว</td><td>เซลล์สุดท้ายแสดงกราฟแท่งแนวนอนหนึ่งแท่งต่อพรรคพร้อมป้ายเปอร์เซ็นต์ ตารางด้านบนแสดงความดึงดูด ความไม่ชอบ อัตรา MN9 (Hz) และความน่าจะเป็นของแต่ละพรรค</td></tr>
 </tbody></table></div>
 
-<h2 id="rollout-risk" style="margin-top:28px">Rollout risk</h2>
+<h2 id="rollout-risk" style="margin-top:28px">ความเสี่ยงเมื่อนำไปใช้</h2>
 <p>
-  <span class="pill grey">schema · no</span>
-  <span class="pill grey">backfill · no</span>
-  <span class="pill grey">irreversible · no</span>
-  <span class="pill grey">contract-skew · no</span>
-  <span class="pill grey">behavior-swap · no</span>
-  <span class="pill grey">cross-app · no</span>
+  <span class="pill grey">เปลี่ยนโครงสร้างข้อมูล · ไม่มี</span>
+  <span class="pill grey">เติมข้อมูลย้อนหลัง · ไม่มี</span>
+  <span class="pill grey">ย้อนกลับไม่ได้ · ไม่มี</span>
+  <span class="pill grey">สัญญาเชื่อมต่อไม่ตรงกัน · ไม่มี</span>
+  <span class="pill grey">สลับพฤติกรรมเดิม · ไม่มี</span>
+  <span class="pill grey">กระทบข้ามแอป · ไม่มี</span>
 </p>
-<p class="muted">Evidence: the repo has one commit (<code>638219c</code>) and one file (<code>README.md</code>, 1 line). There is no database, no deployed service, no consumer. The vendor model is read, never modified.</p>
-<p><strong>Verdict:</strong> no triggers. One PR.</p>
+<p class="muted">ข้อมูลประกอบ ณ ตอนวางแผน: รีโปมีหนึ่งคอมมิต (<code>638219c</code>) และหนึ่งไฟล์ (<code>README.md</code> จำนวน 1 บรรทัด) ยังไม่มีฐานข้อมูล บริการที่เผยแพร่ หรือระบบที่ใช้งานต่อ โมเดลต้นทางจะถูกเรียกใช้โดยไม่แก้ไข</p>
+<p><strong>ข้อสรุป:</strong> ไม่มีเหตุให้ต้องแยกขั้นตอนเปิดใช้ ทำเป็นหนึ่ง PR ได้</p>
 
-<h2 id="out-of-scope" style="margin-top:28px">Out of scope</h2>
+<h2 id="out-of-scope" style="margin-top:28px">นอกขอบเขต</h2>
 <ul>
-  <li>Web UI, API server, or live audience input. The notebook cell is the input.</li>
-  <li>3D neuron mesh rendering.</li>
-  <li>Water, olfactory, or auditory neuron groups. The model supports two Poisson rate groups, and sugar plus bitter use both.</li>
+  <li>หน้าเว็บ เซิร์ฟเวอร์ API หรือการรับข้อความจากผู้ชมแบบสด โดยรับข้อมูลผ่านเซลล์โน้ตบุ๊ก</li>
+  <li>การแสดงโครงข่ายเซลล์ประสาทแบบ 3 มิติ</li>
+  <li>กลุ่มเซลล์ประสาทรับน้ำ กลิ่น หรือเสียง โมเดลรองรับอัตราการกระตุ้นแบบ Poisson สองกลุ่ม ซึ่งใช้กับรสหวานและรสขมแล้ว</li>
 </ul>
 
-<h2 id="edge-cases" style="margin-top:28px">Edge cases</h2>
+<h2 id="edge-cases" style="margin-top:28px">กรณีพิเศษ</h2>
 <div class="tbl"><table>
-<thead><tr><th>Case</th><th>Result</th></tr></thead>
+<thead><tr><th>กรณี</th><th>ผลลัพธ์</th></tr></thead>
 <tbody>
-<tr><td>No neuron spikes (both rates 0 Hz), so the parquet has 0 rows</td><td><code>mn9_rate</code> counts 0 matching rows and returns 0.0 (AC5). The vendor <code>get_rate</code> pivot would be empty and raise <code>KeyError</code>, which is why the plan does not use it.</td></tr>
-<tr><td>First simulation on a fresh clone</td><td><code>run_party</code> creates <code>results/</code> before <code>run_exp</code>. Without it, <code>to_parquet</code> fails after minutes of simulation.</td></tr>
-<tr><td>Two parties quantize to the same Hz pair</td><td>Same <code>exp_name</code>, one simulation, one parquet. Both parties get the same score.</td></tr>
-<tr><td><code>n_run</code> is changed after parquets exist</td><td><code>exp_name</code> includes <code>n_run</code>, so old parquets are not reused.</td></tr>
-<tr><td>Claude returns a score outside [0, 1]</td><td>Pydantic <code>Field(ge=0, le=1)</code> rejects it and <code>parse</code> raises. The notebook cell fails loudly instead of running a bad stimulus.</td></tr>
+<tr><td>ไม่มีเซลล์ประสาทส่งสัญญาณ (ทั้งสองอัตราเป็น 0 Hz) ทำให้ parquet ไม่มีแถว</td><td><code>mn9_rate</code> นับแถวที่ตรงเงื่อนไขได้ 0 และส่งคืน 0.0 (AC5) ส่วนการ pivot ใน <code>get_rate</code> ของโมเดลต้นทางจะได้ผลลัพธ์ว่างและเกิด <code>KeyError</code> แผนจึงไม่ใช้ฟังก์ชันนั้น</td></tr>
+<tr><td>จำลองครั้งแรกหลังโคลนรีโปใหม่</td><td><code>run_party</code> สร้าง <code>results/</code> ก่อนเรียก <code>run_exp</code> มิฉะนั้น <code>to_parquet</code> จะล้มเหลวหลังจำลองไปแล้วหลายนาที</td></tr>
+<tr><td>สองพรรคปัดค่าแล้วได้คู่ความถี่ Hz เดียวกัน</td><td>ใช้ <code>exp_name</code> เดียวกัน จำลองหนึ่งชุดและใช้ parquet หนึ่งไฟล์ ทั้งสองพรรคจะได้คะแนนเท่ากัน</td></tr>
+<tr><td><code>n_run</code> เปลี่ยนหลังจากมีไฟล์ parquet แล้ว</td><td><code>exp_name</code> มี <code>n_run</code> อยู่ด้วย จึงไม่ใช้ parquet เก่าซ้ำ</td></tr>
+<tr><td>Claude ส่งคืนคะแนนนอกช่วง [0, 1]</td><td>Pydantic <code>Field(ge=0, le=1)</code> ปฏิเสธค่า และ <code>parse</code> แจ้งข้อผิดพลาด เซลล์โน้ตบุ๊กหยุดพร้อมแสดงข้อผิดพลาด เพื่อไม่ให้จำลองด้วยสิ่งเร้าที่ไม่ถูกต้อง</td></tr>
 </tbody></table></div>
 
-<h2 id="file-map" style="margin-top:28px">File map</h2>
+<h2 id="file-map" style="margin-top:28px">แผนผังไฟล์</h2>
 <div class="tbl"><table>
-<thead><tr><th style="width:80px">Action</th><th style="width:40%">Path</th><th>Purpose</th></tr></thead>
+<thead><tr><th style="width:80px">การเปลี่ยนแปลง</th><th style="width:40%">ไฟล์</th><th>หน้าที่</th></tr></thead>
 <tbody>
-<tr><td>Modify</td><td><code>README.md</code></td><td>Setup: Python 3.11 venv, install, submodule, run notebook.</td></tr>
-<tr><td>Create</td><td><code>requirements.txt</code></td><td>Pinned deps: brian2, pandas, pyarrow, joblib, anthropic, pydantic, matplotlib, jupyter, pytest.</td></tr>
-<tr><td>Create</td><td><code>.gitignore</code></td><td><code>results/</code>, <code>.venv/</code>, <code>.ipynb_checkpoints/</code>, <code>__pycache__/</code>.</td></tr>
-<tr><td>Create</td><td><code>.gitmodules</code></td><td>Written by <code>git submodule add</code>.</td></tr>
-<tr><td>Create</td><td><code>vendor/Drosophila_brain_model</code></td><td>Git submodule of <code>philshiu/Drosophila_brain_model</code>. Ships <code>model.py</code> and the 783 connectome files.</td></tr>
-<tr><td>Create</td><td><code>flyvote/neurons.py</code></td><td>FlyWire ID constants: <code>SUGAR</code> (21), <code>BITTER</code> (21), <code>MN9_LEFT</code>.</td></tr>
-<tr><td>Create</td><td><code>flyvote/brain.py</code></td><td><code>run_party()</code>, <code>mn9_rate()</code>, <code>elect()</code>, <code>softmax()</code>, <code>quantize_hz()</code>. Wraps the vendor <code>run_exp</code>.</td></tr>
-<tr><td>Create</td><td><code>flyvote/traits.py</code></td><td><code>Traits</code> model and <code>score_party()</code> via Claude structured output.</td></tr>
-<tr><td>Create</td><td><code>fly_election.ipynb</code></td><td>The demo: parties dict, traits table, simulations, probability chart.</td></tr>
-<tr><td>Test</td><td><code>tests/test_brain.py</code></td><td>Pure-function tests for <code>softmax</code>, <code>quantize_hz</code>, <code>mn9_rate</code>, and <code>elect</code>.</td></tr>
+<tr><td>แก้ไข</td><td><code>README.md</code></td><td>วิธีเตรียม Python 3.11 venv ติดตั้งไลบรารี โหลด submodule และรันโน้ตบุ๊ก</td></tr>
+<tr><td>สร้าง</td><td><code>requirements.txt</code></td><td>ข้อกำหนดไลบรารี: brian2, pandas, pyarrow, joblib, anthropic, pydantic, matplotlib, jupyter, pytest</td></tr>
+<tr><td>สร้าง</td><td><code>.gitignore</code></td><td><code>results/</code>, <code>.venv/</code>, <code>.ipynb_checkpoints/</code>, <code>__pycache__/</code>.</td></tr>
+<tr><td>สร้าง</td><td><code>.gitmodules</code></td><td>สร้างโดย <code>git submodule add</code>.</td></tr>
+<tr><td>สร้าง</td><td><code>vendor/Drosophila_brain_model</code></td><td>Git submodule ของ <code>philshiu/Drosophila_brain_model</code> มี <code>model.py</code> และไฟล์แผนผังประสาทรุ่น 783</td></tr>
+<tr><td>สร้าง</td><td><code>flyvote/neurons.py</code></td><td>ค่าคงที่ของ FlyWire ID: <code>SUGAR</code> (21), <code>BITTER</code> (21), <code>MN9_LEFT</code>.</td></tr>
+<tr><td>สร้าง</td><td><code>flyvote/brain.py</code></td><td><code>run_party()</code>, <code>mn9_rate()</code>, <code>elect()</code>, <code>softmax()</code>, <code>quantize_hz()</code> เชื่อมต่อฟังก์ชันต้นทาง <code>run_exp</code>.</td></tr>
+<tr><td>สร้าง</td><td><code>flyvote/traits.py</code></td><td>โมเดลข้อมูล <code>Traits</code> และ <code>score_party()</code> ที่ใช้ผลลัพธ์แบบมีโครงสร้างจาก Claude</td></tr>
+<tr><td>สร้าง</td><td><code>fly_election.ipynb</code></td><td>เดโม: พจนานุกรมพรรค ตารางคุณลักษณะ การจำลอง และกราฟความน่าจะเป็น</td></tr>
+<tr><td>ทดสอบ</td><td><code>tests/test_brain.py</code></td><td>ทดสอบฟังก์ชันคำนวณ <code>softmax</code>, <code>quantize_hz</code>, <code>mn9_rate</code> และ <code>elect</code></td></tr>
 </tbody></table></div>
-<p class="muted"><code>flyvote/__init__.py</code> is empty and not listed. The vendor directory is a submodule rather than a copy because the two parquet files are 190 MB and belong to the paper's repo.</p>
+<p class="muted"><code>flyvote/__init__.py</code> เป็นไฟล์ว่างและไม่ได้แสดงในรายการ ใช้ submodule สำหรับโฟลเดอร์โมเดลต้นทาง เพราะไฟล์ parquet สองไฟล์มีขนาดรวม 190 MB และเป็นส่วนหนึ่งของรีโปงานวิจัย</p>
 
-<h2 id="blast-radius" style="margin-top:28px">Blast radius: no existing consumer</h2>
+<h2 id="blast-radius" style="margin-top:28px">ขอบเขตผลกระทบ: ยังไม่มีระบบใช้งานต่อ</h2>
 <p>
-  <span class="pill task">0 covered</span>
-  <span class="pill unaffected">1 unaffected</span>
-  <span class="pill amber">0 out of scope</span>
-  <span class="pill red">0 missing</span>
+  <span class="pill task">0 ส่วนที่ต้องรองรับ</span>
+  <span class="pill ไม่กระทบ">1 ส่วนไม่กระทบ</span>
+  <span class="pill amber">0 ส่วนนอกขอบเขต</span>
+  <span class="pill red">0 ส่วนที่ขาด</span>
 </p>
 <div class="tbl"><table>
-<thead><tr><th>Consumer</th><th>Where</th><th style="width:110px">Status</th><th>Reason</th></tr></thead>
+<thead><tr><th>ผู้ใช้งานต่อ</th><th>ตำแหน่ง</th><th style="width:110px">สถานะ</th><th>เหตุผล</th></tr></thead>
 <tbody>
-<tr class="group"><th colspan="4">Vendor <code>model.run_exp</code> gains a new caller, <code>flyvote/brain.py</code></th></tr>
-<tr><td><code>example.ipynb</code>, <code>figures.ipynb</code></td><td title="vendor/Drosophila_brain_model/">vendor notebooks</td><td><span class="pill unaffected">unaffected</span></td><td>Vendor files are never edited.</td></tr>
+<tr class="group"><th colspan="4">โมเดลต้นทาง <code>model.run_exp</code> มีผู้เรียกใช้ใหม่คือ <code>flyvote/brain.py</code></th></tr>
+<tr><td><code>example.ipynb</code>, <code>figures.ipynb</code></td><td title="vendor/Drosophila_brain_model/">โน้ตบุ๊กของโมเดลต้นทาง</td><td><span class="pill ไม่กระทบ">ไม่กระทบ</span></td><td>ไม่แก้ไขไฟล์โมเดลต้นทาง</td></tr>
 </tbody></table></div>
 
-<h2 id="tasks" style="margin-top:28px">Tasks</h2>
+<h2 id="tasks" style="margin-top:28px">งานที่ต้องทำ</h2>
 <div class="dep">
-<svg viewBox="0 0 640 120" width="100%" style="max-width:640px" role="img" aria-label="Task dependency graph">
-  <defs><marker id="ah" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8 z" fill="#6b7280"/></marker></defs>
-  <g font-family="-apple-system,sans-serif" font-size="13">
-    <rect x="10" y="10" width="150" height="36" rx="8" fill="#e6ffec" stroke="#86efac"/><text x="85" y="33" text-anchor="middle">1 · Setup</text>
-    <rect x="10" y="60" width="150" height="36" rx="8" fill="#e6ffec" stroke="#86efac"/><text x="85" y="83" text-anchor="middle">2 · brain + neurons</text>
-    <rect x="200" y="60" width="150" height="36" rx="8" fill="#e6ffec" stroke="#86efac"/><text x="275" y="83" text-anchor="middle">3 · traits (Claude)</text>
-    <rect x="450" y="35" width="170" height="36" rx="8" fill="#dbeafe" stroke="#93c5fd"/><text x="535" y="58" text-anchor="middle">4 · Notebook</text>
-    <path d="M160,28 C300,28 380,53 450,53" fill="none" stroke="#6b7280" marker-end="url(#ah)"/>
-    <path d="M160,78 C300,78 380,53 450,53" fill="none" stroke="#6b7280" marker-end="url(#ah)"/>
-    <path d="M350,78 C400,78 420,53 450,53" fill="none" stroke="#6b7280" marker-end="url(#ah)"/>
-  </g>
-</svg>
-<p class="muted">Tasks 1, 2, and 3 run in parallel. Task 4 waits for all three.</p>
+<div class="task-graph" role="group" aria-label="งาน 1 2 และ 3 ทำคู่ขนานกัน งาน 4 รอทุกงานเสร็จ">
+  <div class="parallel-tasks">
+    <a class="task-node" href="#task-1">1 · เตรียมระบบ<small>ไลบรารี · submodule · README</small></a>
+    <a class="task-node" href="#task-2">2 · เชื่อมสมอง + เซลล์ประสาท<small>สิ่งเร้า → อัตรา MN9 · การทดสอบ</small></a>
+    <a class="task-node" href="#task-3">3 · แปลงข้อความด้วย Claude<small>ข้อความ → appeal + aversion + reason</small></a>
+  </div>
+  <div class="task-join">รอครบทั้ง 3 งาน<b aria-hidden="true">→</b></div>
+  <a class="task-node notebook-task" href="#task-4">4 · รวมเป็นโน้ตบุ๊กเดโม<small>กรอกพรรค · ตาราง · จำลอง · กราฟ</small></a>
 </div>
-<p class="legend"><span style="background:var(--green-bg);color:#064e3b">+ added</span><span style="background:var(--red-bg);color:#7f1d1d">- removed</span><span style="background:var(--grey-bg)">unchanged</span></p>
+<p class="muted">งาน 1, 2 และ 3 ทำคู่ขนานกันได้ งาน 4 ต้องรอให้ทั้งสามงานเสร็จ</p>
+</div>
+<p class="legend"><span style="background:var(--green-bg);color:#064e3b">+ เพิ่ม</span><span style="background:var(--red-bg);color:#7f1d1d">- ลบ</span><span style="background:var(--grey-bg)">ไม่เปลี่ยน</span></p>
 
-<article class="task" data-task-id="1" data-depends-on="none">
-  <h3>Task 1 — Set up the environment and vendor the model</h3>
-  <p>Add the paper repo as a git submodule under <code>vendor/</code>, pin dependencies, and write the README setup. The system Python is 3.9.6 and the <code>anthropic</code> 1.x SDK needs 3.10 or newer, so the README uses Python 3.11.</p>
+<article class="task" id="task-1" data-task-id="1" data-depends-on="none">
+  <h3>งาน 1 — เตรียมสภาพแวดล้อมและนำโมเดลต้นทางเข้ามา</h3>
+  <p>เพิ่มรีโปของงานวิจัยเป็น git submodule ใน <code>vendor/</code> กำหนดเวอร์ชันไลบรารี และเขียนวิธีติดตั้งใน README ตามแผนเดิม Python ของเครื่องเป็น 3.9.6 แต่ SDK <code>anthropic</code> รุ่น 1.x ต้องใช้ 3.10 ขึ้นไป จึงกำหนด Python 3.11 ในคู่มือ</p>
   <div class="cols">
-    <div><h4>Files</h4><ul>
-      <li>Create <code>requirements.txt</code></li>
-      <li>Create <code>.gitignore</code></li>
-      <li>Create <code>vendor/Drosophila_brain_model</code> (submodule, writes <code>.gitmodules</code>)</li>
-      <li>Modify <code>README.md</code></li>
+    <div><h4>ไฟล์</h4><ul>
+      <li>สร้าง <code>requirements.txt</code></li>
+      <li>สร้าง <code>.gitignore</code></li>
+      <li>สร้าง <code>vendor/Drosophila_brain_model</code> (submodule ซึ่งสร้าง <code>.gitmodules</code>)</li>
+      <li>แก้ไข <code>README.md</code></li>
     </ul></div>
-    <div><h4>Tests</h4><ul>
-      <li>Seam: manual. Follow the README on a clean venv.</li>
-      <li><code>python -c "import brian2, anthropic"</code> succeeds <span class="tag">manual</span></li>
-      <li><code>ls vendor/Drosophila_brain_model/Connectivity_783.parquet</code> exists <span class="tag">manual</span></li>
-      <li><code>git status</code> after one simulation shows no <code>results/</code> or <code>.venv/</code> entries <span class="tag">manual</span></li>
+    <div><h4>การทดสอบ</h4><ul>
+      <li>จุดทดสอบ: ตรวจด้วยตนเอง ทำตาม README ใน venv ใหม่</li>
+      <li><code>python -c "import brian2, anthropic"</code> ต้องสำเร็จ <span class="tag">ตรวจด้วยตนเอง</span></li>
+      <li><code>ls vendor/Drosophila_brain_model/Connectivity_783.parquet</code> ต้องมีไฟล์ <span class="tag">ตรวจด้วยตนเอง</span></li>
+      <li><code>git status</code> หลังจำลองหนึ่งครั้งต้องไม่แสดง <code>results/</code> หรือ <code>.venv/</code> <span class="tag">ตรวจด้วยตนเอง</span></li>
     </ul></div>
   </div>
-  <details><summary>Diff · 4 files</summary>
-    <div class="diff"><div class="hd"><span>.gitignore</span><span>new file</span></div>
+  <details><summary>ตัวอย่างโค้ด · 4 ไฟล์</summary>
+    <div class="diff"><div class="hd"><span>.gitignore</span><span>ไฟล์ใหม่</span></div>
 <span class="l add">results/</span>
 <span class="l add">.venv/</span>
 <span class="l add">.ipynb_checkpoints/</span>
 <span class="l add">__pycache__/</span>
     </div>
-    <div class="diff"><div class="hd"><span>requirements.txt</span><span>new file</span></div>
+    <div class="diff"><div class="hd"><span>requirements.txt</span><span>ไฟล์ใหม่</span></div>
 <span class="l add">brian2&gt;=2.5.4,&lt;2.8</span>
 <span class="l add">numpy&lt;2</span>
 <span class="l add">pandas</span>
@@ -303,53 +419,53 @@ tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-
 <span class="l add">matplotlib</span>
 <span class="l add">jupyter</span>
 <span class="l add">pytest</span>
-<span class="note">numpy&lt;2: the vendor model was built on numpy 1.24 and brian2 2.5.x does not support numpy 2.</span>
+<span class="note">numpy&lt;2: โมเดลต้นทางสร้างด้วย numpy 1.24 และ brian2 2.5.x ไม่รองรับ numpy 2</span>
     </div>
-    <div class="diff"><div class="hd"><span>vendor/Drosophila_brain_model</span><span>new submodule</span></div>
+    <div class="diff"><div class="hd"><span>vendor/Drosophila_brain_model</span><span>submodule ใหม่</span></div>
 <span class="l add">git submodule add https://github.com/philshiu/Drosophila_brain_model.git vendor/Drosophila_brain_model</span>
     </div>
-    <div class="diff"><div class="hd"><span>README.md</span><span>@@ line 1</span></div>
+    <div class="diff"><div class="hd"><span>README.md</span><span>@@ บรรทัด 1</span></div>
 <span class="l ctx"># Stopid_shxt_X</span>
 <span class="l add"></span>
-<span class="l add">Fly brain election: a fruit-fly connectome votes on Thai parties.</span>
+<span class="l add">เลือกพรรคด้วยสมองแมลงวัน: ใช้แผนผังประสาทแมลงวันผลไม้โหวตให้พรรคการเมืองไทย</span>
 <span class="l add"></span>
-<span class="l add">## Setup</span>
+<span class="l add">## การติดตั้ง</span>
 <span class="l add"></span>
 <span class="l add">    brew install python@3.11</span>
 <span class="l add">    python3.11 -m venv .venv &amp;&amp; source .venv/bin/activate</span>
 <span class="l add">    pip install -r requirements.txt</span>
 <span class="l add">    git submodule update --init</span>
-<span class="l add">    export ANTHROPIC_API_KEY=...   # or `ant auth login`</span>
+<span class="l add">    export ANTHROPIC_API_KEY=...   # หรือ `ant auth login`</span>
 <span class="l add">    jupyter lab fly_election.ipynb</span>
     </div>
   </details>
 </article>
 
-<article class="task" data-task-id="2" data-depends-on="none">
-  <h3>Task 2 — Wrap the brain model: stimulus in, MN9 rate out</h3>
-  <p>Create <code>flyvote/neurons.py</code> with the FlyWire IDs copied from the paper's <code>figures.ipynb</code>, and <code>flyvote/brain.py</code> with the five functions below. <code>run_party</code> quantizes each score to a 20 Hz step so that near-identical parties share a cached parquet, and it puts <code>n_run</code> in <code>exp_name</code> so a changed trial count never reuses a stale file. The MN9 rate is counted straight from the spike parquet: the vendor <code>utils.get_rate</code> pivot raises <code>KeyError</code> on an empty result and loops in Python over every spiking neuron. The vendor import happens inside <code>run_party</code>, so the pure functions test without Brian2 installed.</p>
+<article class="task" id="task-2" data-task-id="2" data-depends-on="none">
+  <h3>งาน 2 — เชื่อมโมเดลสมอง: รับสิ่งเร้า ส่งคืนอัตรา MN9</h3>
+  <p>สร้าง <code>flyvote/neurons.py</code> โดยคัดลอก FlyWire ID จาก <code>figures.ipynb</code> ของงานวิจัย และสร้าง <code>flyvote/brain.py</code> ที่มีห้าฟังก์ชันด้านล่าง <code>run_party</code> ปัดค่าคะแนนเป็นช่วงละ 20 Hz เพื่อให้พรรคที่ได้ค่าใกล้กันใช้ไฟล์ parquet ในแคชร่วมกัน และใส่ <code>n_run</code> ไว้ใน <code>exp_name</code> เพื่อไม่ใช้ไฟล์เก่าเมื่อเปลี่ยนจำนวนรอบทดลอง นับอัตรา MN9 จากไฟล์สัญญาณประสาทโดยตรง เพราะการ pivot ใน <code>utils.get_rate</code> ของโมเดลต้นทางเกิด <code>KeyError</code> เมื่อไม่มีข้อมูล และวนลูป Python ผ่านเซลล์ประสาททุกตัวที่ส่งสัญญาณ นำเข้าโมเดลต้นทางภายใน <code>run_party</code> เพื่อให้ทดสอบฟังก์ชันคำนวณได้โดยไม่ต้องติดตั้ง Brian2</p>
   <div class="cols">
-    <div><h4>Files</h4><ul>
-      <li>Create <code>flyvote/neurons.py</code></li>
-      <li>Create <code>flyvote/brain.py</code></li>
-      <li>Create <code>tests/test_brain.py</code></li>
+    <div><h4>ไฟล์</h4><ul>
+      <li>สร้าง <code>flyvote/neurons.py</code></li>
+      <li>สร้าง <code>flyvote/brain.py</code></li>
+      <li>สร้าง <code>tests/test_brain.py</code></li>
     </ul></div>
-    <div><h4>Tests</h4><ul>
-      <li>Seam: pure functions in <code>flyvote/brain.py</code>. No Brian2, no network.</li>
-      <li><code>quantize_hz(0.83)</code> returns 160; <code>quantize_hz(0.0)</code> returns 0; <code>quantize_hz(1.0)</code> returns 200 <span class="tag">new</span></li>
-      <li><code>softmax([10, 10])</code> returns [0.5, 0.5]; a higher score gets a higher probability; the sum is 1.0 within 1e-6 <span class="tag">new</span></li>
-      <li><code>mn9_rate(empty_spike_frame, n_run=5)</code> returns 0.0; a frame with 10 MN9 rows over 5 trials returns 2.0 (AC5) <span class="tag">new</span></li>
-      <li><code>elect({"A": 40.0, "B": 10.0}, traits)</code> returns a DataFrame with columns <code>appeal</code>, <code>aversion</code>, <code>mn9_hz</code>, <code>prob</code>, A first (AC6) <span class="tag">new</span></li>
+    <div><h4>การทดสอบ</h4><ul>
+      <li>จุดทดสอบ: ฟังก์ชันคำนวณใน <code>flyvote/brain.py</code> ไม่ต้องใช้ Brian2 หรือเครือข่าย</li>
+      <li><code>quantize_hz(0.83)</code> ได้ 160; <code>quantize_hz(0.0)</code> ได้ 0; <code>quantize_hz(1.0)</code> ได้ 200 <span class="tag">เพิ่มใหม่</span></li>
+      <li><code>softmax([10, 10])</code> ได้ [0.5, 0.5]; คะแนนสูงกว่าต้องได้ความน่าจะเป็นสูงกว่า; ผลรวมเป็น 1.0 โดยคลาดเคลื่อนไม่เกิน 1e-6 <span class="tag">เพิ่มใหม่</span></li>
+      <li><code>mn9_rate(empty_spike_frame, n_run=5)</code> ได้ 0.0; ข้อมูล MN9 จำนวน 10 แถวจาก 5 รอบทดลองได้ 2.0 (AC5) <span class="tag">เพิ่มใหม่</span></li>
+      <li><code>elect({"A": 40.0, "B": 10.0}, traits)</code> ส่งคืน DataFrame ที่มีคอลัมน์ <code>appeal</code>, <code>aversion</code>, <code>mn9_hz</code>, <code>prob</code> โดย A อยู่ลำดับแรก (AC6) <span class="tag">เพิ่มใหม่</span></li>
     </ul></div>
   </div>
-  <details><summary>Diff · 3 files</summary>
-    <div class="diff"><div class="hd"><span>flyvote/neurons.py</span><span>new file</span></div>
-<span class="l add"># FlyWire IDs from Shiu et al. 2024, figures.ipynb (version 783)</span>
-<span class="l add">SUGAR = [720575940624963786, 720575940630233916, ...]   # 21 labellar sugar GRNs, right</span>
-<span class="l add">BITTER = [720575940621778381, 720575940602353632, ...]  # 21 bitter GRNs</span>
-<span class="l add">MN9_LEFT = 720575940660219265                           # proboscis motor neuron</span>
+  <details><summary>ตัวอย่างโค้ด · 3 ไฟล์</summary>
+    <div class="diff"><div class="hd"><span>flyvote/neurons.py</span><span>ไฟล์ใหม่</span></div>
+<span class="l add"># FlyWire ID จาก Shiu และคณะ (2024), figures.ipynb (รุ่น 783)</span>
+<span class="l add">SUGAR = [720575940624963786, 720575940630233916, ...]   # เซลล์รับรสหวานที่ปากด้านขวา 21 เซลล์</span>
+<span class="l add">BITTER = [720575940621778381, 720575940602353632, ...]  # เซลล์รับรสขม 21 เซลล์</span>
+<span class="l add">MN9_LEFT = 720575940660219265                           # เซลล์ประสาทสั่งการงวง</span>
     </div>
-    <div class="diff"><div class="hd"><span>flyvote/brain.py</span><span>new file</span></div>
+    <div class="diff"><div class="hd"><span>flyvote/brain.py</span><span>ไฟล์ใหม่</span></div>
 <span class="l add">from pathlib import Path</span>
 <span class="l add">import numpy as np, pandas as pd</span>
 <span class="l add">from .neurons import SUGAR, BITTER, MN9_LEFT</span>
@@ -365,7 +481,7 @@ tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-
 <span class="l add"></span>
 <span class="l add">def mn9_rate(df_spikes: pd.DataFrame, n_run: int, t_run_s: float = 1.0) -&gt; float:</span>
 <span class="l add">    return float((df_spikes["flywire_id"] == MN9_LEFT).sum() / (n_run * t_run_s))</span>
-<span class="note">One row per spike in the parquet. Zero rows gives 0.0 with no special case (AC5).</span>
+<span class="note">ใน parquet หนึ่งแถวแทนหนึ่งสัญญาณประสาท หากไม่มีแถวจะได้ 0.0 โดยไม่ต้องแยกกรณีพิเศษ (AC5)</span>
 <span class="l add"></span>
 <span class="l add">def run_party(appeal: float, aversion: float, n_run: int = 5) -&gt; float:</span>
 <span class="l add">    import sys</span>
@@ -376,19 +492,19 @@ tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-
 <span class="l add">    exp_name = f"s{s}_b{b}_n{n_run}"</span>
 <span class="l add">    params = {**default_params, "r_poi": s * Hz, "r_poi2": b * Hz, "n_run": n_run}</span>
 <span class="l add">    RESULTS.mkdir(parents=True, exist_ok=True)</span>
-<span class="note">run_exp does not create the directory; to_parquet fails after the whole simulation without it.</span>
+<span class="note">run_exp ไม่สร้างโฟลเดอร์ให้ หากไม่มีโฟลเดอร์ to_parquet จะล้มเหลวหลังจำลองเสร็จทั้งหมด</span>
 <span class="l add">    run_exp(exp_name, neu_exc=SUGAR, neu_exc2=BITTER, params=params,</span>
 <span class="l add">            path_res=RESULTS, path_comp=VENDOR / "Completeness_783.csv",</span>
 <span class="l add">            path_con=VENDOR / "Connectivity_783.parquet", n_proc=-1)</span>
-<span class="note">run_exp returns early when results/&lt;exp_name&gt;.parquet exists (model.py line 337). That is the cache (AC4).</span>
+<span class="note">run_exp จะออกจากฟังก์ชันทันทีเมื่อมี results/&lt;exp_name&gt;.parquet (model.py บรรทัด 337) นี่คือแคช (AC4)</span>
 <span class="l add">    df = pd.read_parquet(RESULTS / f"{exp_name}.parquet")</span>
 <span class="l add">    return mn9_rate(df, n_run, float(params["t_run"]))</span>
 <span class="l add"></span>
 <span class="l add">def elect(scores: dict[str, float], traits: dict, temperature: float = 10.0) -&gt; pd.DataFrame:</span>
-<span class="l add">    # columns: party (index), appeal, aversion, mn9_hz, prob; sorted by prob descending</span>
-<span class="l add">    # traits[party] has .appeal and .aversion</span>
+<span class="l add">    # คอลัมน์: party (ดัชนี), appeal, aversion, mn9_hz, prob; เรียง prob จากมากไปน้อย</span>
+<span class="l add">    # traits[party] มี .appeal และ .aversion</span>
     </div>
-    <div class="diff"><div class="hd"><span>tests/test_brain.py</span><span>new file</span></div>
+    <div class="diff"><div class="hd"><span>tests/test_brain.py</span><span>ไฟล์ใหม่</span></div>
 <span class="l add">from flyvote.brain import quantize_hz, softmax, mn9_rate, elect</span>
 <span class="l add"></span>
 <span class="l add">def test_quantize_hz_rounds_to_20hz_steps(): ...</span>
@@ -399,27 +515,27 @@ tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-
   </details>
 </article>
 
-<article class="task" data-task-id="3" data-depends-on="none">
-  <h3>Task 3 — Map free text to taste scores with Claude</h3>
-  <p>Create <code>flyvote/traits.py</code>. One call to <code>client.messages.parse</code> with model <code>claude-opus-5-5</code>, a Pydantic <code>Traits</code> schema, and <code>output_config={"effort": "low"}</code>. The system prompt frames the task as translating a party platform into what a fruit fly tastes. The client takes no API key argument; it reads <code>ANTHROPIC_API_KEY</code> or an <code>ant auth login</code> profile.</p>
+<article class="task" id="task-3" data-task-id="3" data-depends-on="none">
+  <h3>งาน 3 — ใช้ Claude แปลงข้อความเป็นคะแนนรสชาติ</h3>
+  <p>สร้าง <code>flyvote/traits.py</code> ตามแผนเดิม เรียก <code>client.messages.parse</code> หนึ่งครั้ง โดยใช้โมเดล <code>claude-opus-5-5</code> โครงสร้าง <code>Traits</code> ของ Pydantic และ <code>output_config={"effort": "low"}</code> คำสั่งระบบกำหนดให้แปลงนโยบายพรรคเป็นรสชาติที่แมลงวันรับรู้ ตัวไคลเอนต์ไม่รับ API key ผ่านอาร์กิวเมนต์ แต่จะอ่านจาก <code>ANTHROPIC_API_KEY</code> หรือโปรไฟล์ <code>ant auth login</code></p>
   <div class="cols">
-    <div><h4>Files</h4><ul>
-      <li>Create <code>flyvote/traits.py</code></li>
+    <div><h4>ไฟล์</h4><ul>
+      <li>สร้าง <code>flyvote/traits.py</code></li>
     </ul></div>
-    <div><h4>Tests</h4><ul>
-      <li>Seam: manual, in the notebook. A live-API test costs money and the schema check is Pydantic's job.</li>
-      <li>Run <code>score_party("Test", "promises free sugar for every fly")</code>; <code>appeal</code> is above 0.5 and <code>reason</code> is non-empty (AC2) <span class="tag">manual</span></li>
-      <li><code>score_party("Test", "")</code> raises <code>ValueError</code> and makes no API call (AC2) <span class="tag">manual</span></li>
+    <div><h4>การทดสอบ</h4><ul>
+      <li>จุดทดสอบ: ตรวจด้วยตนเองในโน้ตบุ๊ก การเรียก API จริงมีค่าใช้จ่าย และการตรวจโครงสร้างข้อมูลเป็นหน้าที่ของ Pydantic</li>
+      <li>เรียก <code>score_party("ทดสอบ", "สัญญาว่าจะแจกน้ำตาลฟรีให้แมลงวันทุกตัว")</code>; <code>appeal</code> ต้องมากกว่า 0.5 และ <code>reason</code> ต้องไม่ว่าง (AC2) <span class="tag">ตรวจด้วยตนเอง</span></li>
+      <li><code>score_party("ทดสอบ", "")</code> ต้องเกิด <code>ValueError</code> โดยไม่เรียก API (AC2) <span class="tag">ตรวจด้วยตนเอง</span></li>
     </ul></div>
   </div>
-  <details><summary>Diff · 1 file</summary>
-    <div class="diff"><div class="hd"><span>flyvote/traits.py</span><span>new file</span></div>
+  <details><summary>ตัวอย่างโค้ด · 1 ไฟล์</summary>
+    <div class="diff"><div class="hd"><span>flyvote/traits.py</span><span>ไฟล์ใหม่</span></div>
 <span class="l add">import anthropic</span>
 <span class="l add">from pydantic import BaseModel, Field</span>
 <span class="l add"></span>
-<span class="l add">SYSTEM = """You translate a Thai political party's platform into what a fruit fly</span>
-<span class="l add">would taste. appeal = sweetness (0..1), aversion = bitterness (0..1).</span>
-<span class="l add">Score the same text the same way every time. reason: one playful sentence."""</span>
+<span class="l add">SYSTEM = """แปลงนโยบายของพรรคการเมืองไทยเป็นรสชาติที่แมลงวันผลไม้</span>
+<span class="l add">จะรับรู้ โดย appeal = ความหวาน (0..1), aversion = ความขม (0..1)</span>
+<span class="l add">ให้คะแนนข้อความเดียวกันเหมือนเดิมทุกครั้ง reason: เหตุผลสนุก ๆ หนึ่งประโยค"""</span>
 <span class="l add"></span>
 <span class="l add">class Traits(BaseModel):</span>
 <span class="l add">    appeal: float = Field(ge=0, le=1)</span>
@@ -428,87 +544,104 @@ tr.group th{background:var(--grey-bg);color:var(--ink);text-transform:none;font-
 <span class="l add"></span>
 <span class="l add">def score_party(name: str, description: str) -&gt; Traits:</span>
 <span class="l add">    if not description.strip():</span>
-<span class="l add">        raise ValueError(f"{name}: write a description first")</span>
-<span class="note">With an empty description Claude would score the real party from its own knowledge. The team's words, or nothing.</span>
+<span class="l add">        raise ValueError(f"{name}: กรุณากรอกคำอธิบายก่อน")</span>
+<span class="note">ถ้าคำอธิบายว่าง Claude อาจให้คะแนนพรรคจริงจากความรู้ของตัวเอง จึงต้องใช้ข้อความของทีม หรือไม่ประเมินเลย</span>
 <span class="l add">    client = anthropic.Anthropic()</span>
 <span class="l add">    response = client.messages.parse(</span>
 <span class="l add">        model="claude-opus-5-5",</span>
 <span class="l add">        max_tokens=1024,</span>
 <span class="l add">        system=SYSTEM,</span>
 <span class="l add">        output_config={"effort": "low"},</span>
-<span class="l add">        messages=[{"role": "user", "content": f"Party: {name}\n\n{description}"}],</span>
+<span class="l add">        messages=[{"role": "user", "content": f"พรรค: {name}\n\n{description}"}],</span>
 <span class="l add">        output_format=Traits,</span>
 <span class="l add">    )</span>
 <span class="l add">    return response.parsed_output</span>
-<span class="note">No prefill, no forced tool_choice: both return 400 on claude-opus-5-5. Structured output is the supported way to get JSON back.</span>
+<span class="note">ตามแผนเดิม ไม่ใช้ prefill หรือบังคับ tool_choice เพราะทั้งสองแบบส่งคืน 400 บน claude-opus-5-5 ใช้ผลลัพธ์แบบมีโครงสร้างเพื่อรับ JSON</span>
     </div>
   </details>
 </article>
 
-<article class="task" data-task-id="4" data-depends-on="1,2,3">
-  <h3>Task 4 — Write the demo notebook</h3>
-  <p>Create <code>fly_election.ipynb</code> with six cells. The party dict is the only thing a teammate edits: party name to free-text description. Default descriptions are empty strings with a comment to fill them in, so the repo never ships a characterization of a real party, and <code>score_party</code> refuses to run on an empty one. The simulation cell prints a progress line per party because each one takes about one to three minutes on this 10-core machine.</p>
+<article class="task" id="task-4" data-task-id="4" data-depends-on="1,2,3">
+  <h3>งาน 4 — เขียนโน้ตบุ๊กสำหรับเดโม</h3>
+  <p>สร้าง <code>fly_election.ipynb</code> จำนวนหกเซลล์ เพื่อนร่วมทีมแก้เฉพาะพจนานุกรมที่จับคู่ชื่อพรรคกับคำอธิบายอิสระ ค่าเริ่มต้นของคำอธิบายเป็นข้อความว่างพร้อมหมายเหตุให้กรอก เพื่อไม่ใส่คำตัดสินพรรคจริงไว้ในรีโป และ <code>score_party</code> จะไม่รันเมื่อคำอธิบายว่าง เซลล์จำลองแสดงความคืบหน้าของแต่ละพรรค เพราะตามแผนเดิมใช้เวลาประมาณ 1–3 นาทีต่อพรรคบนเครื่อง 10 คอร์นี้</p>
   <div class="cols">
-    <div><h4>Files</h4><ul>
-      <li>Create <code>fly_election.ipynb</code></li>
+    <div><h4>ไฟล์</h4><ul>
+      <li>สร้าง <code>fly_election.ipynb</code></li>
     </ul></div>
-    <div><h4>Tests</h4><ul>
-      <li>Seam: manual. Run all cells with two parties and short descriptions (AC7).</li>
-      <li>Bar chart has one bar per party with a percentage label <span class="tag">manual</span></li>
-      <li>Re-run the simulation cell: it finishes in seconds because every parquet exists (AC4) <span class="tag">manual</span></li>
+    <div><h4>การทดสอบ</h4><ul>
+      <li>จุดทดสอบ: ตรวจด้วยตนเอง รันทุกเซลล์ด้วยสองพรรคและคำอธิบายสั้น ๆ (AC7)</li>
+      <li>กราฟมีหนึ่งแท่งต่อพรรคพร้อมป้ายเปอร์เซ็นต์ <span class="tag">ตรวจด้วยตนเอง</span></li>
+      <li>รันเซลล์จำลองซ้ำ: เสร็จภายในไม่กี่วินาที เพราะมี parquet ครบแล้ว (AC4) <span class="tag">ตรวจด้วยตนเอง</span></li>
     </ul></div>
   </div>
-  <details><summary>Diff · 1 file</summary>
-    <div class="diff"><div class="hd"><span>fly_election.ipynb</span><span>new file · cell outline</span></div>
-<span class="l add"># 1 · imports</span>
+  <details><summary>ตัวอย่างโค้ด · 1 ไฟล์</summary>
+    <div class="diff"><div class="hd"><span>fly_election.ipynb</span><span>ไฟล์ใหม่ · โครงร่างเซลล์</span></div>
+<span class="l add"># 1 · นำเข้าฟังก์ชัน</span>
 <span class="l add">from flyvote.traits import score_party</span>
 <span class="l add">from flyvote.brain import run_party, elect</span>
 <span class="l add"></span>
-<span class="l add"># 2 · parties — edit this cell</span>
+<span class="l add"># 2 · รายชื่อพรรค — แก้ไขเซลล์นี้</span>
 <span class="l add">PARTIES = {</span>
-<span class="l add">    "เพื่อไทย": "",       # describe the platform in your own words</span>
+<span class="l add">    "เพื่อไทย": "",       # อธิบายนโยบายด้วยคำพูดของคุณเอง</span>
 <span class="l add">    "ประชาชน": "",</span>
 <span class="l add">    "ภูมิใจไทย": "",</span>
 <span class="l add">    "ประชาธิปัตย์": "",</span>
 <span class="l add">}</span>
 <span class="l add"></span>
-<span class="l add"># 3 · traits: one Claude call per party, shown as a table (appeal, aversion, reason)</span>
+<span class="l add"># 3 · คุณลักษณะ: เรียก Claude ครั้งละหนึ่งพรรค แสดงตาราง (appeal, aversion, reason)</span>
 <span class="l add">traits = {p: score_party(p, d) for p, d in PARTIES.items()}</span>
 <span class="l add"></span>
-<span class="l add"># 4 · simulate: one run_party per party, print a progress line each</span>
+<span class="l add"># 4 · จำลอง: เรียก run_party ครั้งละหนึ่งพรรค แสดงความคืบหน้าของแต่ละพรรค</span>
 <span class="l add">scores = {p: run_party(t.appeal, t.aversion) for p, t in traits.items()}</span>
 <span class="l add"></span>
-<span class="l add"># 5 · elect: DataFrame of party, appeal, aversion, mn9_hz, prob</span>
+<span class="l add"># 5 · โหวต: DataFrame ของ party, appeal, aversion, mn9_hz, prob</span>
 <span class="l add">result = elect(scores, traits)</span>
 <span class="l add"></span>
-<span class="l add"># 6 · chart: horizontal bars, winner in green, percentage labels (matplotlib)</span>
+<span class="l add"># 6 · กราฟ: แท่งแนวนอน ผู้ชนะใช้สีเขียว พร้อมป้ายเปอร์เซ็นต์ (matplotlib)</span>
     </div>
   </details>
 </article>
 
-<h2 id="test-strategy" style="margin-top:28px">Test strategy</h2>
+<h2 id="test-strategy" style="margin-top:28px">แนวทางทดสอบ</h2>
 <div class="tbl"><table>
-<thead><tr><th style="width:120px">Level</th><th>Seam</th><th>Covers</th></tr></thead>
+<thead><tr><th style="width:120px">ระดับ</th><th>จุดทดสอบ</th><th>ครอบคลุม</th></tr></thead>
 <tbody>
-<tr><td>Unit</td><td>Pure functions in <code>flyvote/brain.py</code>: <code>quantize_hz</code>, <code>softmax</code>, <code>mn9_rate</code>, <code>elect</code>. No Brian2 import, no network. Runs in under a second.</td><td>AC5, AC6</td></tr>
-<tr><td>Manual</td><td>The notebook, run top to bottom with two parties.</td><td>AC1, AC2, AC3, AC4, AC7</td></tr>
+<tr><td>หน่วยย่อย</td><td>ฟังก์ชันคำนวณใน <code>flyvote/brain.py</code>: <code>quantize_hz</code>, <code>softmax</code>, <code>mn9_rate</code>, <code>elect</code> ไม่ต้องนำเข้า Brian2 หรือใช้เครือข่าย รันเสร็จภายในหนึ่งวินาที</td><td>AC5, AC6</td></tr>
+<tr><td>ตรวจด้วยตนเอง</td><td>รันโน้ตบุ๊กจากบนลงล่างด้วยสองพรรค</td><td>AC1, AC2, AC3, AC4, AC7</td></tr>
 </tbody></table></div>
-<p class="muted">No automated simulation test: one <code>run_party</code> call takes minutes and needs the 190 MB connectome. No live Claude test: it costs money per run and Pydantic already enforces the schema.</p>
+<p class="muted">ไม่ทดสอบการจำลองแบบอัตโนมัติ เพราะการเรียก <code>run_party</code> หนึ่งครั้งใช้เวลาหลายนาทีและต้องใช้แผนผังประสาทขนาด 190 MB ไม่ทดสอบ Claude ผ่าน API จริงแบบอัตโนมัติ เพราะมีค่าใช้จ่ายต่อครั้ง และ Pydantic ตรวจโครงสร้างข้อมูลให้อยู่แล้ว</p>
 
-<h2 id="open-questions" style="margin-top:28px">Open questions</h2>
+<h2 id="open-questions" style="margin-top:28px">ประเด็นที่ยังต้องตรวจสอบ</h2>
 <div class="tbl"><table>
-<thead><tr><th style="width:50%">Assumption</th><th>Wrong if</th></tr></thead>
+<thead><tr><th style="width:50%">สมมติฐาน</th><th>ใช้ไม่ได้เมื่อ</th></tr></thead>
 <tbody>
-<tr><td><code>n_run=5</code> trials per party is enough signal for a demo (the paper uses 30).</td><td>MN9 rates swing more than the gap between parties. Fix: raise <code>n_run</code> in the notebook and accept longer runs.</td></tr>
-<tr><td>Softmax temperature 10 Hz spreads probabilities visibly.</td><td>All parties land near 25%, or one lands near 100%. Fix: change <code>temperature</code> in cell 5.</td></tr>
-<tr><td>brian2 2.5.x installs on Python 3.11 with a wheel and compiles with the installed Command Line Tools.</td><td>Install fails. Fix: use Python 3.10, or set <code>prefs.codegen.target = 'numpy'</code> and accept slower runs.</td></tr>
-<tr><td>Claude's refusal path is left unhandled. The skill suggests the server-side <code>fallbacks</code> parameter by default; this plan omits it to keep <code>parse</code> on the non-beta client.</td><td>A party description trips a safety classifier and the cell raises. Fix: reword the description.</td></tr>
+<tr><td><code>n_run=5</code> รอบต่อพรรคให้สัญญาณเพียงพอสำหรับเดโม (งานวิจัยใช้ 30 รอบ)</td><td>อัตรา MN9 ผันผวนมากกว่าช่องว่างคะแนนระหว่างพรรค วิธีแก้: เพิ่ม <code>n_run</code> ในโน้ตบุ๊ก และยอมรับเวลาจำลองที่นานขึ้น</td></tr>
+<tr><td>ค่า temperature ของ softmax ที่ 10 Hz ทำให้ความน่าจะเป็นแตกต่างกันอย่างเห็นได้ชัด</td><td>ทุกพรรคได้ค่าประมาณ 25% หรือพรรคหนึ่งได้เกือบ 100% วิธีแก้: ปรับ <code>temperature</code> ในเซลล์ที่ 5</td></tr>
+<tr><td>brian2 2.5.x ติดตั้งบน Python 3.11 ผ่าน wheel และคอมไพล์ด้วย Command Line Tools ที่มีในเครื่องได้</td><td>ติดตั้งไม่สำเร็จ วิธีแก้: ใช้ Python 3.10 หรือตั้ง <code>prefs.codegen.target = 'numpy'</code> และยอมรับการรันที่ช้าลง</td></tr>
+<tr><td>แผนยังไม่จัดการกรณี Claude ปฏิเสธคำขอ ทักษะที่อ้างอิงในแผนเดิมแนะนำพารามิเตอร์ <code>fallbacks</code> ฝั่งเซิร์ฟเวอร์ แต่แผนนี้ละไว้เพื่อใช้ <code>parse</code> กับไคลเอนต์ที่ไม่ใช่รุ่นเบตา</td><td>คำอธิบายพรรคกระตุ้นตัวตรวจความปลอดภัยจนเซลล์เกิดข้อผิดพลาด วิธีแก้: ปรับถ้อยคำในคำอธิบาย</td></tr>
 </tbody></table></div>
 
 </section>
 
-<p class="footer">Last updated 2026-10-10 · no ticket · branch fly-brain-election</p>
+<p class="footer">อัปเดต 2026-10-10 · ไม่มีทิกเก็ต · สาขา fly-brain-election</p>
 </main>
 </div>
+<script>
+const detailsButton = document.getElementById('toggle-details');
+const allDetails = Array.from(document.querySelectorAll('details'));
+function syncDetailsButton() {
+  const expanded = allDetails.every(detail => detail.open);
+  detailsButton.setAttribute('aria-expanded', String(expanded));
+  detailsButton.innerHTML = expanded
+    ? 'ปิดรายละเอียดทั้งหมด <span aria-hidden="true">−</span>'
+    : 'เปิดรายละเอียดทั้งหมด <span aria-hidden="true">＋</span>';
+}
+detailsButton.addEventListener('click', () => {
+  const open = !allDetails.every(detail => detail.open);
+  allDetails.forEach(detail => { detail.open = open; });
+  syncDetailsButton();
+});
+allDetails.forEach(detail => detail.addEventListener('toggle', syncDetailsButton));
+</script>
 </body>
 </html>

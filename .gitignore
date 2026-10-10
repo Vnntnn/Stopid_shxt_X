@@ -1,0 +1,7 @@
+.venv/
+__pycache__/
+*.pyc
+vendor/onfly/*.pt
+vendor/onfly/*.part
+.runtime/
+.DS_Store

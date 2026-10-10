@@ -1,0 +1,89 @@
+<div id="fly-election-demo">
+  <h2>🪰 คูหาเลือกตั้งแมลงวัน</h2>
+  <div class="text-small text-muted">ต้นแบบแนวคิด · พรรคสมมติ · ใช้สูตรตัวอย่าง ยังไม่เชื่อมแบบจำลองสมอง</div>
+  <div class="viz-grid fe-parties">
+    <section>
+      <h3>พรรคกล้วย</h3>
+      <div>“กล้วยฟรีทุกครัวเรือน เปิดถังขยะ 24 ชั่วโมง”</div>
+      <div class="fe-inputs" data-party="a"></div>
+    </section>
+    <section>
+      <h3>พรรคฝาชี</h3>
+      <div>“เพิ่มที่หลบภัย ลดไม้ตีแมลงวัน แต่ปิดถังขยะ”</div>
+      <div class="fe-inputs" data-party="b"></div>
+    </section>
+  </div>
+  <div class="viz-row"><button class="btn btn-primary" type="button" id="fe-vote">เปิดคูหา · ผู้มีสิทธิ์สมมติ 100 ตัว</button></div>
+  <div class="fe-results" aria-live="polite" id="fe-result-text">ปรับสิ่งเร้าที่แปลงจากนโยบาย แล้วเปิดคูหา</div>
+  <div class="fe-ballots" role="img" aria-label="สัดส่วนคะแนนพรรคกล้วย พรรคฝาชี และงดออกเสียง">
+    <div id="fe-bar-a"></div><div id="fe-bar-b"></div><div id="fe-bar-n"></div>
+  </div>
+  <div class="viz-row fe-legend"><span>● พรรคกล้วย <b id="fe-count-a" class="tabular-nums">—</b></span><span>◆ พรรคฝาชี <b id="fe-count-b" class="tabular-nums">—</b></span><span>○ งดออกเสียง <b id="fe-count-n" class="tabular-nums">—</b></span></div>
+</div>
+<style>
+  #fly-election-demo .fe-parties { margin: 16px 0; gap: 24px; }
+  #fly-election-demo h3 { margin: 0 0 8px; }
+  #fly-election-demo .fe-inputs { margin-top: 16px; display: grid; gap: 10px; }
+  #fly-election-demo .fe-field-head { display: flex; justify-content: space-between; gap: 8px; }
+  #fly-election-demo .fe-results { margin: 16px 0 10px; }
+  #fly-election-demo .fe-ballots { display: flex; height: 32px; background: var(--muted); overflow: hidden; }
+  #fly-election-demo .fe-ballots > div { transition: width .6s ease; width: 0; }
+  #fly-election-demo #fe-bar-a { background: var(--viz-series-1); }
+  #fly-election-demo #fe-bar-b { background: var(--viz-series-2); }
+  #fly-election-demo #fe-bar-n { background: var(--muted-foreground); opacity: .4; }
+  #fly-election-demo .fe-legend { justify-content: space-between; margin-top: 10px; }
+  @media (max-width: 520px) { #fly-election-demo .fe-parties { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) { #fly-election-demo .fe-ballots > div { transition: none; } }
+</style>
+<script>
+(() => {
+  const root = document.getElementById('fly-election-demo');
+  const defaults = { a: [85,25,55], b: [35,90,15] };
+  const labels = ['อาหาร / น้ำตาล','ที่หลบภัย','อันตราย / สิ่งที่หลีกเลี่ยง'];
+  let values = {a: defaults.a.slice(), b: defaults.b.slice()};
+  let hasResult = false;
+  function compatible(v) { return v && ['a','b'].every(p => Array.isArray(v[p]) && v[p].length === 3 && v[p].every(x => Number.isFinite(x) && x >= 0 && x <= 100)); }
+  const saved = window.openai?.widgetState?.modelContent;
+  if (compatible(saved?.stimuli)) values = {a: saved.stimuli.a.slice(), b: saved.stimuli.b.slice()};
+  function save(result) {
+    if (window.openai?.setWidgetState) window.openai.setWidgetState({modelContent:{prototype:'fly-election-toy-formula',stimuli:values,result:result || null},privateContent:null}).catch(() => {});
+  }
+  root.querySelectorAll('.fe-inputs').forEach(box => {
+    const p = box.dataset.party;
+    labels.forEach((label,i) => {
+      const field = document.createElement('div');
+      const head = document.createElement('div'); head.className = 'fe-field-head';
+      const l = document.createElement('label'); l.className = 'form-label'; l.htmlFor = 'fe-'+p+'-'+i; l.textContent = label;
+      const output = document.createElement('span'); output.className = 'tabular-nums'; output.id = 'fe-value-'+p+'-'+i; output.textContent = values[p][i] + '/100';
+      const input = document.createElement('input'); input.type = 'range'; input.className = 'form-range'; input.min = '0'; input.max = '100'; input.value = values[p][i]; input.id = l.htmlFor;
+      input.addEventListener('input', () => { values[p][i] = Number(input.value); output.textContent = input.value + '/100'; if (hasResult) root.querySelector('#fe-result-text').textContent = 'สิ่งเร้าเปลี่ยนแล้ว · เปิดคูหาอีกครั้งเพื่อคำนวณ'; });
+      input.addEventListener('change', () => save());
+      head.append(l,output); field.append(head,input); box.append(field);
+    });
+  });
+  function vote() {
+    let seed = 71;
+    function rand() { seed = (Math.imul(seed,1664525) + 1013904223) >>> 0; return seed / 4294967296; }
+    const count = {a:0,b:0,n:0};
+    for (let i=0;i<100;i++) {
+      const food = .5 + rand(), refuge = .2 + rand(), risk = .6 + rand();
+      const score = p => food*values[p][0] + refuge*values[p][1] - risk*values[p][2];
+      const a = score('a'), b = score('b');
+      if (Math.max(a,b) < 15 || Math.abs(a-b) < 6) count.n++; else count[a>b?'a':'b']++;
+    }
+    for (const p of ['a','b','n']) { root.querySelector('#fe-bar-'+p).style.width = count[p]+'%'; root.querySelector('#fe-count-'+p).textContent = count[p]+' ตัว'; }
+    const winner = count.a === count.b ? 'คะแนนเสมอ' : (count.a>count.b?'พรรคกล้วย':'พรรคฝาชี')+' ได้คะแนนมากกว่า';
+    root.querySelector('#fe-result-text').textContent = winner + ' · ผลจากสูตรตัวอย่างและประชากรสมมติชุดเดิม';
+    hasResult = true; save(count);
+  }
+  root.querySelector('#fe-vote').addEventListener('click',vote);
+  window.addEventListener('openai:set_globals',event => {
+    const v = event.detail?.globals?.widgetState?.modelContent?.stimuli;
+    if (!compatible(v)) return;
+    values = {a:v.a.slice(),b:v.b.slice()};
+    for (const p of ['a','b']) for (let i=0;i<3;i++) { root.querySelector('#fe-'+p+'-'+i).value = values[p][i]; root.querySelector('#fe-value-'+p+'-'+i).textContent = values[p][i]+'/100'; }
+    hasResult = false; root.querySelector('#fe-result-text').textContent = 'ปรับสิ่งเร้าที่แปลงจากนโยบาย แล้วเปิดคูหา';
+    for (const p of ['a','b','n']) { root.querySelector('#fe-bar-'+p).style.width='0%'; root.querySelector('#fe-count-'+p).textContent='—'; }
+  });
+})();
+</script>

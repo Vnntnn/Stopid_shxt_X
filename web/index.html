@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Fly Decision Lab · On-Fly-Jev</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <link rel="stylesheet" href="/static/project.css">
+  <script src="/static/app.js" defer></script>
+  <script src="/static/comparison-options.js" defer></script>
+  <script src="/static/projects.js" defer></script>
+</head>
+<body>
+  <div class="shell">
+    <header><a class="brand" href="/" aria-label="Fly Decision Lab home"><span class="mark">✳</span> FLY DECISION LAB <span class="version">01</span></a><div id="status" class="status" role="status"><i></i><span>กำลังโหลดโมเดล…</span></div></header>
+    <section class="intro"><div><div class="eyebrow">ON-FLY-JEV / ELECTION POLICY LAB</div><h1>โปรเจกต์นโยบาย<span class="accent">.</span></h1><p>เลือกสองพรรค เลือกนโยบาย แล้วให้ On-Fly-Jev เปรียบเทียบ</p></div><div class="intro-note"><span class="tiny">RUNS ON YOUR MACHINE</span><strong>เลือกคู่ → เปรียบเทียบ → ดูผล</strong><span>ผลเลือกจาก On-Fly-Jev ไม่ใช่ผลโหวตจริง</span></div></section>
+    <section id="project-app">
+      <section id="project-home" class="project-home">
+        <div class="panel create-panel">
+          <div class="panel-title"><span><b class="step">01</b> สร้างโปรเจกต์</span><span class="tiny">หนึ่งโปรเจกต์ต่อหนึ่งการเลือกตั้ง</span></div>
+          <form id="project-form" class="project-form">
+            <label for="project-name">ชื่อโปรเจกต์</label><input id="project-name" maxlength="120" placeholder="เช่น เปรียบเทียบนโยบายเลือกตั้ง กทม." required>
+            <label for="election-name">การเลือกตั้ง</label><input id="election-name" maxlength="160" placeholder="เช่น เลือกตั้งผู้ว่าฯ และ ส.ก. กรุงเทพมหานคร" required>
+            <div class="project-form-row"><div><label for="election-year">ปี</label><input id="election-year" maxlength="20" placeholder="2569"></div><div><label for="election-location">พื้นที่</label><input id="election-location" maxlength="120" placeholder="กรุงเทพมหานคร"></div></div>
+            <div id="project-error" class="error" role="alert" hidden></div><button class="run-button" type="submit"><span>สร้างโปรเจกต์</span><span aria-hidden="true">＋</span></button>
+          </form>
+        </div>
+        <div class="project-list-panel"><div class="section-heading"><div><span class="eyebrow">SAVED WORKSPACES</span><h2>โปรเจกต์ของคุณ</h2></div><span id="project-count" class="tiny">0 โปรเจกต์</span></div><div id="project-list" class="project-list"><p class="muted">ยังไม่มีโปรเจกต์ เริ่มจากสร้างโปรเจกต์การเลือกตั้งก่อน</p></div></div>
+      </section>
+      <section id="project-workspace" hidden>
+        <div class="workspace-heading"><button id="back-projects" class="text-button">← โปรเจกต์ทั้งหมด</button><div><span class="eyebrow">ELECTION PROJECT</span><h2 id="current-project-name"></h2><p id="current-project-meta" class="muted"></p></div><button id="legacy-toggle" class="secondary-button">เปิดโหมดทดลองเดิม</button></div>
+        <div class="workspace-tabs" role="tablist" aria-label="หน้าของโปรเจกต์">
+          <button id="workspace-compare-tab" class="active" role="tab" aria-selected="true" aria-controls="workspace-compare">เปรียบเทียบ</button>
+          <button id="workspace-data-tab" role="tab" aria-selected="false" aria-controls="workspace-data">ชุดข้อมูล</button>
+          <button id="workspace-summary-tab" role="tab" aria-selected="false" aria-controls="workspace-summary">หน้าสรุป</button>
+        </div>
+        <section id="workspace-compare" class="comparison-workspace" role="tabpanel" aria-labelledby="workspace-compare-tab">
+          <div class="comparison-heading"><div><span class="eyebrow">HEAD TO HEAD</span><h2>เลือกคู่ที่จะเปรียบเทียบ</h2><p>เลือกนโยบายในประเด็นเดียวกันจากคนละพรรค</p></div><button id="quick-mock" class="secondary-button" type="button">ลองด้วยสองพรรคสมมติ</button></div>
+          <div class="comparison-cards">
+            <article class="comparison-card side-a">
+              <div class="comparison-card-heading"><span class="comparison-letter">A</span><span>ฝั่งแรก</span><span id="compare-count-a" class="tiny"></span></div>
+              <label for="compare-party-a">พรรค</label><select id="compare-party-a"></select>
+              <div id="compare-load-a" class="card-load" role="status" hidden></div>
+              <div id="compare-load-error-a" class="error" role="alert" hidden></div><button id="compare-retry-a" class="text-button" type="button" hidden>ลองโหลดอีกครั้ง ↻</button>
+              <label for="compare-search-a">ค้นหานโยบาย</label><input id="compare-search-a" type="search" placeholder="เช่น ค่าเดินทาง สุขภาพ การศึกษา">
+              <label for="compare-a">นโยบายที่จะเปรียบเทียบ</label><select id="compare-a"></select>
+              <div id="compare-preview-a" class="selected-policy"></div>
+            </article>
+            <div class="versus-mark" aria-hidden="true">↔</div>
+            <article class="comparison-card side-b">
+              <div class="comparison-card-heading"><span class="comparison-letter">B</span><span>อีกฝั่ง</span><span id="compare-count-b" class="tiny"></span></div>
+              <label for="compare-party-b">พรรค</label><select id="compare-party-b"></select>
+              <div id="compare-load-b" class="card-load" role="status" hidden></div>
+              <div id="compare-load-error-b" class="error" role="alert" hidden></div><button id="compare-retry-b" class="text-button" type="button" hidden>ลองโหลดอีกครั้ง ↻</button>
+              <label for="compare-search-b">ค้นหานโยบาย</label><input id="compare-search-b" type="search" placeholder="เช่น ค่าเดินทาง สุขภาพ การศึกษา">
+              <label for="compare-b">นโยบายที่จะเปรียบเทียบ</label><select id="compare-b"></select>
+              <div id="compare-preview-b" class="selected-policy"></div>
+            </article>
+          </div>
+          <div class="comparison-tools"><p id="comparison-source-note" class="hint"></p><button id="comparison-custom" class="text-button" type="button">เพิ่มพรรค / ผู้สมัครจาก URL อื่น ↗</button></div>
+          <div class="panel comparison-settings">
+            <div class="comparison-context"><div><label for="compare-criterion">อยากให้เลือกจากเกณฑ์อะไร?</label><input id="compare-criterion" maxlength="600" value="นโยบายใดตอบโจทย์ผู้คนตามสถานการณ์นี้ได้มากกว่า?"></div><div><label for="compare-situation">สถานการณ์หรือกลุ่มคน <span class="field-note">ไม่บังคับ</span></label><textarea id="compare-situation" rows="2" maxlength="600" placeholder="เช่น คนทำงานที่ต้องขึ้นรถเมล์ทุกวัน"></textarea></div></div>
+            <div id="compare-error" class="error" role="alert" hidden></div>
+            <div class="comparison-action"><p id="compare-status" role="status"></p><button id="run-project-compare" class="run-button" type="button"><span>เปรียบเทียบคู่นี้</span><span aria-hidden="true">↗</span></button></div>
+          </div>
+          <div id="compare-result" class="compare-result" role="status" hidden></div>
+        </section>
+        <section id="workspace-data" class="workspace-grid" role="tabpanel" aria-labelledby="workspace-data-tab" hidden>
+          <div class="panel template-panel"><div class="panel-title"><span><b class="step">＋</b> เพิ่มข้อมูลในโปรเจกต์</span><span class="tiny">DATA SOURCE</span></div>
+            <div class="template-cards">
+              <button class="template-card" data-template="mock"><span class="template-icon">✳</span><strong>Mock data</strong><small>สองพรรคสมมติ · พรรคละ 5 นโยบาย</small></button>
+              <button class="template-card" data-template="thai_election"><span class="template-icon">◎</span><strong>นโยบายเลือกตั้งไทย</strong><small>เพื่อไทย / ประชาชน / ภูมิใจไทย / ประชาธิปัตย์</small></button>
+              <button class="template-card" data-template="bma_tracker"><span class="template-icon">▤</span><strong>ตัวติดตามนโยบาย กทม.</strong><small>รายการกลยุทธ์และ action plan ของ กทม.</small></button>
+              <button class="template-card" data-template="bangkok_candidate"><span class="template-icon">⌖</span><strong>นโยบายผู้สมัคร กทม.</strong><small>ประชาชน / ประชาธิปัตย์ / URL ผู้สมัคร</small></button>
+            </div>
+            <div id="source-controls" class="source-controls" hidden>
+              <label id="source-label" for="source-url">แหล่งข้อมูล</label>
+              <select id="source-preset" hidden><option value="https://election.ptp.or.th/policy">พรรคเพื่อไทย · เลือกตั้ง 2569</option><option value="https://election69.peoplesparty.or.th/policy/">พรรคประชาชน · เลือกตั้ง 2569</option><option value="https://bkk2569.peoplesparty.or.th/policy/">พรรคประชาชน · เลือกตั้ง กทม. 2569</option><option value="custom">ระบุ URL เอง</option></select>
+              <input id="source-url" type="url" placeholder="https://…" hidden>
+              <div id="source-party-field" hidden><label for="source-party">ชื่อพรรค <span class="field-note">สำหรับ URL ที่ยังไม่ระบุพรรค</span></label><input id="source-party" maxlength="200" placeholder="ชื่อพรรคเจ้าของนโยบายจาก URL นี้"></div>
+              <p id="source-note" class="hint"></p><div id="import-error" class="error" role="alert" hidden></div>
+              <button id="preview-source" class="run-button" type="button"><span>ดึงข้อมูลและตรวจตัวอย่าง</span><span aria-hidden="true">↗</span></button>
+            </div>
+            <div id="preview-area" class="preview-area" hidden><div class="preview-heading"><div><strong id="preview-title">ตัวอย่างข้อมูล</strong><span id="preview-count" class="tiny"></span></div><button id="discard-preview" class="text-button" type="button">ยกเลิก</button></div><p id="preview-source-name" class="hint"></p><div id="preview-list" class="preview-list"></div><button id="save-import" class="run-button" type="button"><span>บันทึกนโยบายในโปรเจกต์</span><span aria-hidden="true">↓</span></button></div>
+          </div>
+          <div class="panel policies-panel"><div class="panel-title"><span><b class="step">▤</b> ชุดข้อมูลในโปรเจกต์</span><span id="policy-total" class="tiny">0 รายการ</span></div>
+            <div id="policy-empty" class="empty compact-empty"><h2>ยังไม่มีข้อมูล</h2><p>เลือกเทมเพลตเพื่อโหลดข้อมูลตัวอย่างหรือข้อมูลจริง</p></div>
+            <div id="policy-browser" hidden><label for="policy-search">ค้นหานโยบายทั้งหมด</label><input id="policy-search" type="search" placeholder="ค้นหาชื่อ หมวดหมู่ หรือพรรค"><div class="policy-table-head"><span>นโยบายที่นำเข้า</span><span>หมวดหมู่ · แหล่งข้อมูล</span></div><div id="policy-table" class="policy-table"></div></div>
+          </div>
+        </section>
+        <section id="workspace-summary" class="panel summary-panel" role="tabpanel" aria-labelledby="workspace-summary-tab" hidden><div class="panel-title"><span><b class="step">04</b> สรุปโปรเจกต์</span><span class="tiny">PROJECT SUMMARY</span></div><div class="summary-metrics"><div><span class="tiny">นโยบายที่บันทึก</span><strong id="summary-policy-count">0</strong></div><div><span class="tiny">หมวดหมู่</span><strong id="summary-category-count">0</strong></div><div><span class="tiny">การเปรียบเทียบ</span><strong id="summary-decision-count">0</strong></div></div><div class="summary-columns"><section><h3>นโยบายแยกตามหมวดหมู่</h3><div id="summary-categories" class="summary-bars"></div></section><section><h3>แหล่งข้อมูล</h3><div id="summary-sources" class="summary-bars"></div></section></div><section><h3>ผลตัดสินใจ On-Fly-Jev</h3><p class="hint">แสดงผลเปรียบเทียบที่รันในโปรเจกต์นี้ โมเดลไม่ได้ประเมินคุณภาพนโยบายหรือทำนายผลเลือกตั้ง</p><div id="summary-decisions" class="decision-list"></div></section><button id="summary-to-data" class="secondary-button">เปรียบเทียบอีกคู่</button></section>
+      </section>
+    </section>
+    <main id="legacy-lab" hidden>
+      <section class="panel input-panel">
+        <div class="panel-title"><span><b class="step">01</b> ตั้งการทดลอง</span><span class="tiny">INPUT</span></div>
+        <div class="tabs" role="tablist" aria-label="โหมดการทดลอง"><button class="active" id="tab-policy" role="tab" aria-selected="true" aria-controls="mode-policy" data-mode="policy">นโยบาย A / B</button><button id="tab-custom" role="tab" aria-selected="false" aria-controls="mode-custom" data-mode="custom">เลือกคำตอบทั่วไป</button><button id="tab-json" role="tab" aria-selected="false" aria-controls="mode-json" data-mode="json">JSON API</button></div>
+        <form id="experiment">
+          <div id="mode-policy" role="tabpanel" aria-labelledby="tab-policy">
+            <div class="preset-row"><span class="tiny">ตัวอย่าง</span><button type="button" data-preset="food">หาอาหาร · EN</button><button type="button" data-preset="safety">หนีอันตราย · EN</button><button type="button" data-preset="thai">ภาษาไทย</button></div>
+            <label for="state">สถานการณ์ของแมงวัน <span class="field-note">State</span></label><textarea id="state" rows="3" maxlength="16000"></textarea>
+            <label for="question">อยากให้เลือกตามเกณฑ์อะไร <span class="field-note">Question</span></label><textarea id="question" rows="2" maxlength="4000"></textarea>
+            <div class="options-grid"><div class="policy-card a"><div class="option-heading"><span class="letter">A</span><span>ตัวเลือก A</span></div><label class="sr-only" for="name-a">ชื่อตัวเลือก A</label><input id="name-a" maxlength="100" placeholder="ชื่อพรรค / ตัวเลือก"><label class="sr-only" for="policy-a">นโยบาย A</label><textarea id="policy-a" rows="4" maxlength="8000" placeholder="นโยบาย / สิ่งที่จะเกิดขึ้น"></textarea></div><div class="policy-card b"><div class="option-heading"><span class="letter">B</span><span>ตัวเลือก B</span></div><label class="sr-only" for="name-b">ชื่อตัวเลือก B</label><input id="name-b" maxlength="100" placeholder="ชื่อพรรค / ตัวเลือก"><label class="sr-only" for="policy-b">นโยบาย B</label><textarea id="policy-b" rows="4" maxlength="8000" placeholder="นโยบาย / สิ่งที่จะเกิดขึ้น"></textarea></div></div>
+            <p class="hint">นโยบายทั้งหมดส่งเป็น State ส่วนตัวเลือกใช้ A / B เพื่อให้โมเดลอ่านเนื้อหาได้ครบ</p>
+          </div>
+          <div id="mode-custom" role="tabpanel" aria-labelledby="tab-custom" hidden>
+            <div class="preset-row"><span class="tiny">ตัวอย่าง</span><button type="button" id="ticket-preset">คัดแยกเคสบริการ</button></div>
+            <label for="custom-state">สถานการณ์ <span class="field-note">State</span></label><textarea id="custom-state" rows="5" maxlength="16000">My card was charged twice for the same order. I need a refund.</textarea>
+            <label for="custom-question">คำถาม <span class="field-note">Question</span></label><textarea id="custom-question" rows="2" maxlength="4000">Which team should handle this customer request?</textarea>
+            <label>ตัวเลือก <span class="field-note">2–8 choices</span></label><div id="custom-options"></div><button id="add-option" class="text-button" type="button">+ เพิ่มตัวเลือก</button>
+          </div>
+          <div id="mode-json" role="tabpanel" aria-labelledby="tab-json" hidden>
+            <div class="preset-row"><span class="tiny">ชนิดคำถาม</span><button type="button" id="json-preset">Choice + Score + Noul</button></div>
+            <label for="json-input">Request JSON <span class="field-note">/v1/systemone</span></label><textarea id="json-input" class="code" rows="17" maxlength="60000" spellcheck="false"></textarea><p class="hint">รองรับข้อความหรือ JSON ใน state และคำถามแบบ choice, score, noul</p>
+          </div>
+          <div class="run-options"><label class="check"><input type="checkbox" id="compare">ลองสลับลำดับตัวเลือกด้วย <span class="field-note">2 model calls</span></label></div>
+          <div id="error" class="error" role="alert" hidden></div>
+          <button id="run" class="run-button" type="submit" disabled><span id="run-label">รอโมเดลพร้อม…</span><span aria-hidden="true">↗</span></button>
+          <p class="hint foot-hint">ไม่มีการแปลหรือให้ AI ตัวอื่นให้คะแนนก่อนส่ง · ภาษาไทยยังไม่ได้รับการยืนยันความแม่นยำ</p>
+        </form>
+      </section>
+      <aside class="results-column">
+        <section class="panel result-panel"><div class="panel-title"><span><b class="step">02</b> ผลที่โมเดลเลือก</span><span class="tiny">OUTPUT</span></div>
+          <div id="empty" class="empty"><div class="fly-emblem" aria-hidden="true">✳</div><h2>พร้อมรับบัตรเลือกตั้ง</h2><p>กด “ให้โมเดลเลือก” เพื่อรันจริง<br>ผลจะแสดงพร้อมน้ำหนักของแต่ละตัวเลือก</p><div class="empty-label">ONE INPUT. ONE DECISION.</div></div>
+          <div id="loading" class="loading" hidden><div class="spinner"></div><h2>แมงวันกำลังเลือก…</h2><p>กำลังคำนวณด้วย On-Fly-Jev ในเครื่อง</p></div>
+          <div id="result" hidden><div class="result-top"><span class="eyebrow">MODEL SELECTION</span><span id="time" class="tiny"></span></div><h2 id="winner"></h2><p id="winner-note" class="hint"></p><div id="answers"></div><div class="metrics"><div><span class="tiny">INFERENCE</span><strong id="latency">—</strong></div><div><span class="tiny">INPUT TOKENS</span><strong id="tokens">—</strong></div><div><span class="tiny">DEVICE</span><strong id="device">CPU</strong></div></div><div id="comparison" hidden></div><button id="download" class="text-button" type="button">↓ ดาวน์โหลดผล + input เป็น JSON</button></div>
+          <p class="result-disclaimer">เปอร์เซ็นต์คือการกระจายน้ำหนักการเลือกของโมเดล ไม่ใช่คะแนนเสียงของประชากรแมงวันหรือคำตัดสินว่านโยบายดีแค่ไหน</p>
+        </section>
+        <section class="panel about"><span class="eyebrow">WHAT IS RUNNING?</span><h3>โมเดลจริงที่อิงเซลล์แมงวัน</h3><p>On-Fly-Jev เป็นโมเดลภาษาที่ฝึกจากโครงสร้างซึ่งอิงเซลล์แมงวัน 100 เซลล์ และมี decision head สำหรับเลือกคำตอบ ไม่ใช่การจำลองสมองแมงวันทั้งตัว</p><a href="https://huggingface.co/Quazim0t0/On-Fly-Jev" target="_blank" rel="noopener">โมเดลโดย Dean Byrne / Quazim0t0 ↗</a><details><summary>ดูข้อมูลตัวรัน</summary><pre id="runtime-info">กำลังตรวจสอบ…</pre></details><details id="raw-details" hidden><summary>ดู request / response ล่าสุด</summary><pre id="raw-output"></pre></details></section>
+      </aside>
+    </main><footer><span>FLY DECISION LAB — ELECTION POLICY LAB</span><span>ข้อมูลจากแหล่งที่มาแสดงพร้อม URL · ผลโมเดลไม่ใช่เสียงของผู้มีสิทธิเลือกตั้ง</span></footer>
+  </div>
+</body>
+</html>
