@@ -6,3 +6,17 @@ vendor/onfly/*.part
 .runtime/
 .DS_Store
 .env
+.runtime-server.log
+On-Fly-Jev/venv/
+On-Fly-Jev/**/*.pt
+!On-Fly-Jev/fly100.pt
+# On-Fly-Jev non-essentials (recordings, eval outputs, LFS stubs, notes)
+On-Fly-Jev/doom_runs/
+On-Fly-Jev/videos/
+On-Fly-Jev/eval/
+On-Fly-Jev/docs/
+On-Fly-Jev/calibrated/
+On-Fly-Jev/logo.png
+On-Fly-Jev/.gitattributes
+On-Fly-Jev/eval_fast_decisions*.json
+On-Fly-Jev/eval_fast_decisions.bat

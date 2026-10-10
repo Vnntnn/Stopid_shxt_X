@@ -1,0 +1,9 @@
+__pycache__/
+data/
+runs/
+.pytest_cache/
+venv/
+.venv/
+*.pt
+!fly100.pt
+.playwright-mcp/
