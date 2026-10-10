@@ -639,7 +639,11 @@ function rawData(tab) {
   return sessionExport(run);
 }
 function rawHint(v) {
-  if (v && typeof v === 'object' && 't_ms' in v && 'stage' in v) return `+${v.t_ms} ms ${v.stage}/${v.status}`;
+  if (v && typeof v === 'object' && 't_ms' in v && 'stage' in v) {
+    const msg = v.event && v.event.error && v.event.error.message;
+    return `+${v.t_ms} ms ${v.stage}/${v.status}` + (msg ? ` "${String(msg).slice(0, 80)}"` : '');
+  }
+  if (v && typeof v === 'object' && !Array.isArray(v) && v.error && v.error.message) return `error "${String(v.error.message).slice(0, 80)}"`;
   return '';
 }
 function rawMessage(tab) {
@@ -714,7 +718,7 @@ function renderRaw() {
   const bytes = byteSize(data);
   const nEv = run ? run.events.length : 0;
   $('raw-size').textContent = formatBytes(bytes) + (tab === 'final' ? '' : ` · ${nEv} event${nEv === 1 ? '' : 's'}`) + (bytes > LARGE_BYTES ? ' · large: long strings shortened' : '');
-  const keep = st.scroll;
+  const keep = pane.scrollTop;
   const follow = tab !== 'final' && pane.scrollHeight - pane.scrollTop - pane.clientHeight < 40 && !run.done;
   const { lines, capped } = tokenizeJson(data, { collapse: st.cs, fullPaths: st.full, maxLines: st.cap, hint: rawHint });
   const frag = document.createDocumentFragment();
@@ -734,12 +738,10 @@ function renderRaw() {
 }
 let rawFocus = null;
 
-$('rawpane').addEventListener('scroll', () => { if (rawTabs[rawPrefs.tab]) rawTabs[rawPrefs.tab].scroll = $('rawpane').scrollTop; });
 $('rawpane').addEventListener('click', (e) => {
   const b = e.target.closest('button[data-act]');
   if (!b) return;
   const st = rawTabs[rawPrefs.tab];
-  st.scroll = $('rawpane').scrollTop;
   rawFocus = { act: b.dataset.act, path: b.dataset.path };
   if (b.dataset.act === 'fold') st.cs = toggleCollapsed(st.cs, b.dataset.path, Number(b.dataset.depth));
   else if (b.dataset.act === 'full') { st.full.add(b.dataset.path); rawFocus = null; }
@@ -822,6 +824,7 @@ function setRawTab(t) {
   $('rawpane').scrollTop = rawTabs[t].scroll;
 }
 function setView(v, persist = true) {
+  if (view === 'raw' && !$('rawview').hidden) rawTabs[rawPrefs.tab].scroll = $('rawpane').scrollTop;
   view = v === 'raw' ? 'raw' : 'cards';
   $('out').dataset.view = view;
   for (const b of $('view-seg').children) { const on = b.dataset.view === view; b.setAttribute('aria-selected', String(on)); b.tabIndex = on ? 0 : -1; }
