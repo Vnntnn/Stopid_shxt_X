@@ -86,3 +86,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .mic[aria-pressed="true"] { animation: none; }
   .bars .fill { transition: none; }
 }
+
+.stages li .dbg { grid-column: 1 / -1; font-size: 12px; }
+.stages li .dbg summary { cursor: pointer; color: var(--muted); padding-left: 30px; }
+.stages li .dbg pre { margin: 4px 0 2px 30px; padding: 6px 8px; max-height: 180px; overflow: auto; background: rgba(0,0,0,.4); border: 1px solid var(--line); border-radius: 8px; color: #cfd8ff; white-space: pre-wrap; word-break: break-word; }
+.stages.compact li.wide { flex-basis: 100%; }

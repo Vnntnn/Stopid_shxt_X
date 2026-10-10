@@ -27,6 +27,7 @@ let controller = null;
 let lastText = '';
 let tick = null;
 let starts = {};
+const openDebug = new Set();
 
 function renderStages(state) {
   const ol = $('stages');
@@ -43,6 +44,21 @@ function renderStages(state) {
     const ms = document.createElement('span'); ms.className = 'ms';
     ms.textContent = st.ms != null && st.status !== 'running' && st.status !== 'pending' ? st.ms + ' ms' : '';
     li.append(ico, name, ms);
+    if (st.status !== 'pending') {
+      const det = document.createElement('details');
+      det.className = 'dbg';
+      det.open = openDebug.has(s);
+      det.addEventListener('toggle', () => { if (det.open) openDebug.add(s); else openDebug.delete(s); li.classList.toggle('wide', det.open); });
+      li.classList.toggle('wide', det.open);
+      const sum = document.createElement('summary');
+      sum.textContent = `Debug: ${s}`;
+      const pre = document.createElement('pre');
+      let body;
+      try { body = JSON.stringify({ status: st.status, ms: st.ms, error: st.error, data: st.data }, null, 2); } catch (_) { body = String(st.data); }
+      pre.textContent = body;
+      det.append(sum, pre);
+      li.append(det);
+    }
     return li;
   }));
 }
