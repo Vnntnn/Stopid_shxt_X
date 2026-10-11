@@ -86,3 +86,11 @@ test('cancelling speech or recording again stops the countdown, while settings o
   c.settingsClose.trigger('click'); assert.equal(c.settings.open, false);
   assert.deepEqual(c.sent, []);
 });
+
+
+test('empty messages never submit the placeholder as a question', async () => {
+  const c = await setup();
+  c.send.trigger('click');
+  c.question.value = '   '; c.send.trigger('click');
+  assert.deepEqual(c.sent, []);
+});

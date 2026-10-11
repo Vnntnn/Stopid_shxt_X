@@ -19,7 +19,7 @@ export function createComposer({ question, send, mic, activity, status, confirma
   }
   function submit() {
     if (send.disabled) return;
-    const text = (question.value || question.placeholder || '').trim();
+    const text = (question.value || '').trim();
     if (!text) return;
     cancelCountdown();
     setMicStatus('');

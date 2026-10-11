@@ -24,15 +24,36 @@ if (params.has('mock') || camMock) {
 }
 
 // ---- Scene ----
-const scene = createScene($('stage'), { reducedMotion: reduced });
+const flyBubble = $('fly-bubble');
+let bubbleTimer = null;
+let speechSeq = 0;
+function hideFlyBubble() {
+  speechSeq++;
+  clearTimeout(bubbleTimer);
+  flyBubble.hidden = true;
+  flyBubble.dataset.speaking = 'false';
+}
+function positionFlyBubble(x, y, z) {
+  if (flyBubble.hidden) return;
+  const stage = $('stage');
+  const width = flyBubble.offsetWidth, height = flyBubble.offsetHeight;
+  const anchorX = x * stage.clientWidth, anchorY = y * stage.clientHeight;
+  const left = Math.max(12, Math.min(stage.clientWidth - width - 12, anchorX - width / 2));
+  const top = Math.max(12, Math.min(stage.clientHeight - height - 20, anchorY - height - 12));
+  flyBubble.style.transform = `translate3d(${left.toFixed(1)}px, ${top.toFixed(1)}px, 0)`;
+  flyBubble.style.setProperty('--bubble-tail-x', Math.max(16, Math.min(width - 16, anchorX - left)) + 'px');
+  flyBubble.style.visibility = z < -1 || z > 1 ? 'hidden' : '';
+}
+const scene = createScene($('stage'), { reducedMotion: reduced, onFlyPosition: positionFlyBubble });
 if (!scene.ok) $('webgl-fallback').hidden = false;
 function fly(state, opts) {
+  if (state === 'listening' || state === 'thinking') hideFlyBubble();
   scene.setState(state, opts);
   engine.setState(state, opts);
   $('fly-state').textContent = state;
 }
 if (params.has('mock')) window.__fly = { scene };
-addEventListener('pagehide', () => { scene.dispose(); engine.dispose(); });
+addEventListener('pagehide', () => { hideFlyBubble(); scene.dispose(); engine.dispose(); });
 
 // ---- Fly sound (stupid on purpose). Nothing plays until a Send / mic / Replay click unlocks audio. ----
 const engine = createFlyAudio();
@@ -69,6 +90,7 @@ const JINGLE = { A: 'winA', B: 'winB', none: 'winNone', inconclusive: 'sad' };
 const isPad = (d) => d === 'A' || d === 'B' || d === 'none';
 
 function cancelVoice() {
+  hideFlyBubble();
   runSeq += 1;
   clearInterval(landTimer); clearTimeout(speakTimer);
   if (voice && voice.abort) voice.abort.abort();
@@ -100,15 +122,31 @@ function startVoice(final) {
 }
 
 async function speak(v) {
+  if (v !== voice) return;
+  const session = ++speechSeq;
+  clearTimeout(bubbleTimer);
   engine.stopVoice();
+  $('fly-bubble-text').textContent = v.text;
+  flyBubble.hidden = false;
+  flyBubble.dataset.speaking = 'false';
+  const settleBubble = () => {
+    if (session !== speechSeq || v !== voice) return;
+    flyBubble.dataset.speaking = 'false';
+    // Keep the words readable after playback, including muted or unavailable audio.
+    bubbleTimer = setTimeout(hideFlyBubble, Math.max(5000, v.text.length * 60));
+  };
+  if (prefs.muted || engine.ducked) { settleBubble(); return; }
   const buf = v.buffer || (v.failed ? null : await v.promise);
-  if (v !== voice) return;
-  if (prefs.muted || engine.ducked) return;
+  if (v !== voice || session !== speechSeq) return;
+  if (prefs.muted || engine.ducked) { settleBubble(); return; }
   engine.setState('speaking');
+  flyBubble.dataset.speaking = 'true';
   let played = false;
-  if (buf) played = await engine.playVoice(buf, { seed: v.text });
-  else if (engine.canSpeak) played = await engine.speakFallback(v.text, v.lang);
-  if (v !== voice) return;
+  try {
+    if (buf) played = await engine.playVoice(buf, { seed: v.text });
+    else if (engine.canSpeak) played = await engine.speakFallback(v.text, v.lang);
+  } finally { settleBubble(); }
+  if (v !== voice || session !== speechSeq) return;
   $('voice-note').hidden = !(v.failed || (!buf && !played));
   engine.setState('landed');
 }
@@ -1284,21 +1322,27 @@ const cam = createCamera({
     const on = s === 'on';
     $('cam-toggle').setAttribute('aria-pressed', String(on || s === 'starting'));
     $('cam-toggle').setAttribute('aria-label', on || s === 'starting' ? 'ปิดกล้อง' : 'เปิดกล้อง');
-    $('cam-toggle-label').textContent = on || s === 'starting' ? 'กล้องเปิดอยู่' : 'เปิดกล้อง';
-    $('cam-box').hidden = !(on || s === 'starting');
+    $('cam-toggle-label').textContent = on || s === 'starting' ? 'ปิดกล้อง' : 'เปิดกล้อง';
+    $('cam-toggle').title = on || s === 'starting' ? 'ปิดกล้อง' : 'เปิดกล้อง';
+    $('cam-view').dataset.state = s;
+    $('cam-video').hidden = !on || camMock;
+    $('cam-overlay').hidden = !on;
+    $('cam-details').hidden = !on;
+    $('cam-fallback').hidden = on && !camMock;
+    $('cam-fallback-title').textContent = s === 'starting' ? 'กำลังเปิดกล้อง…' : s === 'error' ? 'เปิดกล้องไม่ได้' : on ? 'กล้องจำลอง' : 'กล้องปิดอยู่';
+    $('cam-fallback-hint').textContent = s === 'starting' ? 'กดปุ่มกล้องอีกครั้งเพื่อยกเลิก' : s === 'error' ? 'พิมพ์หรือใช้ไมค์คุยต่อได้เลย' : on ? 'ท่าทางจำลอง · ไม่ใช้กล้องจริง' : 'เปิดกล้อง หรือพิมพ์คุยได้เลย';
     $('cam-mockbadge').hidden = !camMock;
     $('cam-timeline').hidden = !camMock;
     if (!on) $('mock-caption').hidden = true;
     $('cam-mode').textContent = st.mode === 'full' ? 'ท่าทางและมือ' : st.mode === 'motion-only' ? 'ตรวจการเคลื่อนไหว' : st.mode === 'mock' ? 'จำลองท่าทาง' : '';
     camStatus(s === 'on' ? '' : msg, s === 'error');
-    if (!on) { $('cam-fps').textContent = '0 fps'; flyApi.setAttention(null); memes.clear(); }
+    if (!on) { $('cam-fps').textContent = '0 fps'; $('cam-last').textContent = 'ยังไม่พบท่าทาง'; flyApi.setAttention(null); memes.clear(); }
   },
 });
 $('cam-toggle').addEventListener('click', () => {
   engine.unlock();
   if (cam.running || cam.starting) cam.stop('ปิดกล้องแล้ว'); else cam.start();
 });
-$('cam-stop').addEventListener('click', () => cam.stop('ปิดกล้องแล้ว'));
 document.addEventListener('visibilitychange', () => { if (document.hidden && (cam.running || cam.starting)) cam.stop('ปิดกล้องเมื่อเปลี่ยนแท็บ'); });
 addEventListener('pagehide', () => cam.stop(null, true));
 // Mock camera: the timeline is the gesture tour, or the "Copy me" dance while Copy me is on

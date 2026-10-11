@@ -215,7 +215,7 @@ export function createCamera(opts) {
       if (mine !== seq) { requestedStream.getTracks().forEach((t) => t.stop()); return false; }
       stream = requestedStream;
       video.srcObject = stream; video.muted = true; video.playsInline = true;
-      for (const t of stream.getVideoTracks()) t.addEventListener('ended', () => { if (state.running) stop('The camera was disconnected.'); });
+      for (const t of stream.getVideoTracks()) t.addEventListener('ended', () => { if (mine === seq && (state.running || state.starting)) stop('The camera was disconnected.'); });
       await video.play();
       if (mine !== seq) return false;
       state.running = true; state.starting = false; state.mode = 'motion-only';

@@ -425,45 +425,59 @@ button.jcaret:hover { background: #eee2c5; }
   .cam-box { width: 100%; inset: auto; }
 }
 
-/* A single compact chat composer, with media actions always within reach. */
-.composer.you { top: auto; bottom: 18px; right: 18px; width: min(360px, 40vw); padding: 12px;
-  border: 1px solid #c7a265; border-radius: 16px; background: rgba(255,248,229,.97);
-  box-shadow: 0 6px 24px rgba(87,47,20,.16); }
+/* Camera chat card: media controls and composer float over the preview. */
+.composer.you { top: 18px; bottom: auto; right: 18px; width: min(400px, 40vw); padding: 0;
+  max-height: calc(100% - 36px); overflow: auto; border: 1px solid #c7a265; border-radius: 18px;
+  background: transparent; box-shadow: 0 6px 24px rgba(87,47,20,.2); }
 .composer::before { display: none; }
-.composer-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
-.composer-head h2 { margin: 0; padding: 0; font-family: inherit; font-weight: 600; font-size: 12px; line-height: 1.5; color: #70417c; }
-.composer-dot { width: 6px; height: 6px; border-radius: 50%; background: #84915e; }
-.composer-channel { margin-left: auto; color: #a68a60; font-size: 11px; }
-.composer #q { display: block; min-height: 56px; max-height: 112px; padding: 5px 0; resize: none;
+.composer .cam-box { position: relative; inset: auto; width: 100%; padding: 0; margin: 0;
+  border: 0; border-radius: inherit; background: transparent; backdrop-filter: none; }
+.composer .cam-view { width: 100%; min-height: 340px; aspect-ratio: 4 / 3; margin: 0; border-radius: inherit;
+  background: radial-gradient(ellipse at 50% 35%, rgba(84,64,93,.9), rgba(41,27,50,.9) 75%); }
+.composer .cam-view[data-state="on"]::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(180deg, rgba(24,14,29,.55), transparent 32%, transparent 48%, rgba(24,14,29,.65)); }
+.cam-fallback { position: absolute; inset: 65px 16px 125px; display: flex; flex-direction: column; align-items: center;
+  justify-content: center; gap: 6px; text-align: center; color: #e4d3e6; }
+.cam-fallback svg { margin-bottom: 4px; color: #c9abc9; }
+.cam-fallback strong { font-size: 15px; font-weight: 500; }
+.cam-fallback span { font-size: 12px; color: #c5b5c8; }
+.composer-head { position: absolute; z-index: 2; inset: 12px 12px auto; display: flex; align-items: center; gap: 6px; }
+.composer-toolbar { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.composer-icon, .composer-icon.mic, .composer-icon.cam-toggle { display: grid; place-items: center;
+  width: 36px; height: 36px; flex: none; padding: 0; margin: 0; border: 1px solid rgba(255,243,215,.2);
+  border-radius: 10px; background: rgba(35,22,42,.65); color: #fff3d7; backdrop-filter: blur(8px); }
+.composer-icon:hover { background: #70417c; }
+.composer-icon[aria-pressed="true"] { color: #fff0ca; background: #70417c; border-color: #c7a265; animation: none; }
+.composer-icon.mic[aria-pressed="true"] { background: #ad4141; border-color: #f0a8a8; }
+.cam-toggle[aria-pressed="true"] .cam-slash { display: none; }
+.composer-float { position: absolute; z-index: 2; inset: auto 12px 12px; }
+.composer-input { display: flex; align-items: flex-end; gap: 8px; padding: 8px;
+  border: 1px solid rgba(199,162,101,.8); border-radius: 14px; background: rgba(255,248,229,.75);
+  backdrop-filter: blur(12px); box-shadow: 0 3px 14px rgba(0,0,0,.15); }
+.composer-input:focus-within { border-color: #70417c; outline: 2px solid rgba(199,162,101,.7); outline-offset: 2px; }
+.composer #q { display: block; flex: 1; min-width: 0; min-height: 56px; max-height: 112px; padding: 5px 3px; resize: none;
   border: 0; border-radius: 0; background: transparent; font-size: 13px; line-height: 1.5; box-shadow: none; }
 .composer #q:focus-visible { outline: none; }
-.composer:focus-within { border-color: #70417c; box-shadow: 0 0 0 2px rgba(112,65,124,.12), 0 6px 24px rgba(87,47,20,.16); }
-.composer-toolbar { display: flex; align-items: center; gap: 3px; margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
-.composer-icon, .composer-icon.mic, .composer-icon.cam-toggle { display: grid; place-items: center;
-  width: 32px; height: 32px; flex: none; padding: 0; margin: 0; border: 0; border-radius: 8px; background: transparent; color: #7a674a; }
-.composer-icon:hover { color: #70417c; background: #eee0ed; }
-.composer-icon[aria-pressed="true"] { color: #fff0ca; background: #70417c; animation: none; }
-.composer-icon.mic[aria-pressed="true"] { background: #ad4141; }
-.composer-icon.composer-send { margin-left: auto; color: #fff0ca; background: #70417c; box-shadow: none; }
+.composer-icon.composer-send { width: 40px; height: 40px; margin-bottom: 2px; color: #fff0ca; background: #70417c;
+  border: 0; box-shadow: none; }
 .composer-icon.composer-send:hover { background: #593264; }
-.composer-shortcut { margin-left: auto; color: #9b8665; font-size: 10px; white-space: nowrap; }
-.composer-icon.composer-send { margin-left: 6px; }
-.voice-activity { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px; margin-top: 8px; color: var(--muted); font-size: 11px; }
+.voice-activity { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px; padding: 7px 9px; margin-bottom: 8px;
+  border-radius: 10px; background: #fff8e5; color: var(--muted); font-size: 11px; }
 .voice-activity .timer, .voice-activity .meter { display: none; }
 .voice-activity.recording .timer { display: block; color: #ad4141; }
 .voice-activity.recording .meter { display: block; grid-column: 1 / -1; height: 3px; margin: 0; }
-.voice-confirm { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.voice-confirm { display: flex; align-items: center; justify-content: space-between; gap: 6px; padding: 7px 9px; margin-bottom: 8px;
+  border-radius: 10px; background: #fff8e5; font-size: 11px; color: var(--muted); }
 .voice-confirm button { background: transparent; border: 0; padding: 2px; color: #70417c; }
-.composer .cam-status { margin: 6px 0 0; font-size: 11px; }
-.composer .cam-box { display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 3px 8px;
-  padding: 0; margin: 8px 0; border: 0; background: transparent; backdrop-filter: none; }
-.composer .cam-view { grid-row: 1 / 5; width: 112px; margin: 0; align-self: start; }
-.composer .cam-on { font-size: 8px; padding: 2px 5px; letter-spacing: 0; left: 4px; top: 4px; }
+.composer .cam-status { margin: 0 0 8px; padding: 7px 9px; border-radius: 10px; background: #fff8e5;
+  max-height: 72px; overflow: auto; font-size: 11px; }
+.composer .cam-details { position: absolute; z-index: 1; left: 14px; right: 14px; top: 60px;
+  color: #fff3d7; font-size: 10px; text-shadow: 0 1px 4px #291b32; pointer-events: none; }
+.composer .cam-on, .composer .cam-mockbadge { position: static; display: inline-flex; margin: 0 4px 5px 0;
+  font-size: 9px; padding: 2px 6px; letter-spacing: 0; }
 .composer .cam-on i { width: 5px; height: 5px; }
-.composer .cam-mockbadge { font-size: 8px; padding: 1px 4px; letter-spacing: 0; }
-.composer .cam-line { margin: 0; gap: 4px; font-size: 10px; }
-.composer .cam-last { margin: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.composer .cam-note { margin: 0; font-size: 9px; line-height: 1.4; }
+.composer .cam-line { margin: 0; gap: 6px; font-size: 10px; color: inherit; }
+.composer .cam-last { margin: 2px 0 0; color: inherit; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .composer .cam-timeline { display: none; }
 .chat-settings { width: min(420px, 92vw); max-height: 80vh; overflow: auto; }
 .chat-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
@@ -472,6 +486,24 @@ button.jcaret:hover { background: #eee2c5; }
 .chat-settings .cam-actions-body { max-height: none; overflow: visible; }
 .chat-settings .mimic-sub { display: none; }
 @media (max-width: 800px) {
-  .composer.you { position: relative; inset: auto; width: auto; margin: 10px; }
+  .composer.you { position: relative; inset: auto; width: auto; max-height: none; margin: 10px; overflow: hidden; }
+  .composer .cam-view { min-height: 350px; }
+  .composer-icon, .composer-icon.mic, .composer-icon.cam-toggle { width: 40px; height: 40px; }
+  .composer-head { gap: 4px; }
   .stage { margin-top: 8px; }
+}
+
+/* Follow the fly's projected position, with a tail pointing toward its model. */
+.fly-speech-bubble { position: absolute; z-index: 3; left: 0; top: 0; width: max-content;
+  max-width: min(300px, calc(100% - 24px)); padding: 12px 16px; border: 1px solid #c7a265;
+  border-radius: 18px; background: rgba(255,248,229,.9); color: #623269; font-size: 14px; line-height: 1.55;
+  box-shadow: 0 5px 20px rgba(41,27,50,.18); backdrop-filter: blur(8px); pointer-events: none;
+  overflow-wrap: anywhere; transform: translate3d(24px, 60px, 0); }
+.fly-speech-bubble::after { content: ""; position: absolute; bottom: -7px;
+  left: var(--bubble-tail-x, 50%); width: 12px; height: 12px; transform: translateX(-50%) rotate(45deg);
+  border-right: 1px solid #c7a265; border-bottom: 1px solid #c7a265; background: #fff8e5; }
+.fly-speech-bubble[data-speaking="true"] { border-color: #70417c; }
+.fly-speech-bubble[data-speaking="true"]::after { border-color: #70417c; }
+@media (max-width: 800px) {
+  .fly-speech-bubble { max-width: min(240px, calc(100% - 24px)); padding: 9px 12px; font-size: 12px; }
 }

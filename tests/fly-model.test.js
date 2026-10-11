@@ -170,7 +170,10 @@ test('main scene connects camera hooks to the textured fly, pauses during a deci
   let scene;
   try {
     const { createScene } = await import(sceneUrl);
-    scene = createScene({ clientWidth: 1360, clientHeight: 800, appendChild() {} });
+    const positions = [];
+    scene = createScene({ clientWidth: 1360, clientHeight: 800, appendChild() {} }, {
+      onFlyPosition: (x, y, z) => positions.push({ x, y, z }),
+    });
     assert.equal(await scene.modelReady, true);
     assert.equal(scene.modelStatus, 'ready');
     const model = rendered.getObjectByName('Housefly');
@@ -184,6 +187,7 @@ test('main scene connects camera hooks to the textured fly, pauses during a deci
     assert.ok(fly.rotation.z > .4);
     assert.ok(fly.scale.y < FLY_SCALE);
     assert.ok(scene.getPose().weight > .99);
+    const hoverAnchor = positions.at(-1);
     const raised = model.getObjectByName('rf_upper').quaternion.clone();
     scene.setState('deciding', { pad: 'A' }); tick(1);
     assert.equal(scene.settled, false);
@@ -192,10 +196,16 @@ test('main scene connects camera hooks to the textured fly, pauses during a deci
     tick(70);
     assert.equal(scene.landed, true);
     assert.equal(scene.settled, true);
+    assert.ok(positions.every(({ x, y, z }) => [x, y, z].every(Number.isFinite)), 'bubble projection stays finite');
+    assert.ok(positions.at(-1).x < hoverAnchor.x, 'bubble follows the fly to its left landing flower');
+    assert.ok(positions.at(-1).y > hoverAnchor.y, 'bubble follows the fly down as it lands');
     assert.ok(fly.scale.y < FLY_SCALE, 'copy mode resumes on the flower');
     scene.setPoseWeight(0); scene.setOffsets({}); tick(50);
     assert.equal(fly.scale.y, FLY_SCALE);
     assert.equal(scene.getPose().weight, 0);
+    const anchorBeforeGesture = positions.at(-1);
+    scene.setOffsets({ dx: 1 }); tick(1);
+    assert.ok(positions.at(-1).x > anchorBeforeGesture.x, 'bubble also follows camera gesture offsets');
     assert.equal(rendered.background, null, 'transparent scene keeps the Thai background visible');
     assert.ok(rendered.children.every((o) => o.position.toArray().every(Number.isFinite)));
   } finally {

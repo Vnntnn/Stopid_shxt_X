@@ -82,7 +82,7 @@ function drawLabel(sprite, id, label, prob, win) {
   sprite.material.map.needsUpdate = true;
 }
 
-export function createScene(container, { reducedMotion = false } = {}) {
+export function createScene(container, { reducedMotion = false, onFlyPosition } = {}) {
   let renderer;
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
@@ -262,6 +262,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
   let dive = null; // {curve, t, dur, padId}
   const tmp = new THREE.Vector3();
   const tmp2 = new THREE.Vector3();
+  const bubbleAnchor = new THREE.Vector3();
 
   const rigTarget = { ...IDLE_RIG };
   let rigCur = { ...IDLE_RIG }, poseW = 0, poseWT = 0;
@@ -465,6 +466,13 @@ export function createScene(container, { reducedMotion = false } = {}) {
     camera.lookAt(0, -0.2, 0);
 
     renderer.render(scene, camera);
+    if (onFlyPosition) {
+      // Project an anchor above the body after the fly and camera have moved.
+      camera.updateMatrixWorld();
+      fly.localToWorld(bubbleAnchor.set(0, 0.75, 0));
+      bubbleAnchor.project(camera);
+      onFlyPosition((bubbleAnchor.x + 1) / 2, (1 - bubbleAnchor.y) / 2, bubbleAnchor.z);
+    }
   }
   frame();
 

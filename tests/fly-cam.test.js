@@ -42,9 +42,9 @@ const deferred = () => { let resolve; const promise = new Promise((r) => { resol
 const flush = () => new Promise((r) => setImmediate(r));
 async function cameraHarness(run) {
   const originals = Object.fromEntries(['window', 'navigator', 'requestAnimationFrame', 'cancelAnimationFrame'].map((key) => [key, Object.getOwnPropertyDescriptor(globalThis, key)]));
-  const calls = [], frames = new Map(), states = [];
+  const calls = [], frames = new Map(), states = [], trackEvents = {};
   let stopped = 0, closed = 0;
-  const track = { stop() { stopped++; }, addEventListener() {} };
+  const track = { stop() { stopped++; }, addEventListener(name, fn) { trackEvents[name] = fn; } };
   const stream = { getTracks: () => [track], getVideoTracks: () => [track] };
   const media = { getUserMedia: async (constraints) => { calls.push(constraints); return stream; } };
   Object.defineProperty(globalThis, 'window', { configurable: true, value: { isSecureContext: true } });
@@ -57,7 +57,7 @@ async function cameraHarness(run) {
   const base = { video, overlay: { width: 320, height: 240, getContext: () => ({ clearRect() {} }) },
     engine: { reset() {}, update: () => [] }, fetchImpl: async () => ({ ok: true }),
     visionLoader: async () => vision(), onState: (s) => states.push(s) };
-  try { await run({ createCamera, base, video, media, calls, frames, states, stream, vision, stopped: () => stopped, closed: () => closed }); }
+  try { await run({ createCamera, base, video, media, calls, frames, states, stream, vision, trackEvents, stopped: () => stopped, closed: () => closed }); }
   finally {
     for (const [key, descriptor] of Object.entries(originals)) {
       if (descriptor) Object.defineProperty(globalThis, key, descriptor); else delete globalThis[key];
@@ -128,5 +128,64 @@ test('models finishing after stop are closed instead of reviving the camera', as
     assert.equal(cam.state.mode, 'off');
     assert.equal(h.video.srcObject, null);
     assert.equal(h.states.at(-1), 'off');
+  });
+});
+
+
+test('permission denial leaves no stream and allows a later retry', async () => {
+  await cameraHarness(async (h) => {
+    h.media.getUserMedia = async () => { throw { name: 'NotAllowedError' }; };
+    const cam = h.createCamera(h.base);
+    assert.equal(await cam.start(), false);
+    assert.equal(h.states.at(-1), 'error');
+    assert.equal(cam.starting, false);
+    assert.equal(cam.running, false);
+    assert.equal(h.video.srcObject, null);
+    h.media.getUserMedia = async () => h.stream;
+    assert.equal(await cam.start(), true);
+    cam.stop();
+  });
+});
+
+test('a failed video playback releases the camera before showing the error fallback', async () => {
+  await cameraHarness(async (h) => {
+    h.video.play = async () => { throw new Error('Playback failed'); };
+    const cam = h.createCamera(h.base);
+    assert.equal(await cam.start(), false);
+    assert.equal(h.states.at(-1), 'error');
+    assert.equal(cam.running, false);
+    assert.equal(cam.starting, false);
+    assert.equal(h.video.srcObject, null);
+    assert.equal(h.stopped(), 1);
+    assert.equal(h.frames.size, 0);
+  });
+});
+
+test('camera disconnection during playback startup cancels startup and releases the stream', async () => {
+  await cameraHarness(async (h) => {
+    const playback = deferred();
+    h.video.play = () => playback.promise;
+    const cam = h.createCamera(h.base);
+    const starting = cam.start(); await flush();
+    h.trackEvents.ended(); playback.resolve();
+    assert.equal(await starting, false);
+    assert.equal(h.states.at(-1), 'off');
+    assert.equal(cam.running, false);
+    assert.equal(cam.starting, false);
+    assert.equal(h.video.srcObject, null);
+    assert.equal(h.stopped(), 1);
+    assert.equal(h.frames.size, 0);
+  });
+});
+
+test('camera disconnection after startup closes models and returns to the off fallback', async () => {
+  await cameraHarness(async (h) => {
+    const cam = h.createCamera(h.base);
+    await cam.start(); h.trackEvents.ended();
+    assert.equal(h.states.at(-1), 'off');
+    assert.equal(cam.running, false);
+    assert.equal(h.video.srcObject, null);
+    assert.equal(h.closed(), 2);
+    assert.equal(h.frames.size, 0);
   });
 });
