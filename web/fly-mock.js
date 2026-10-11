@@ -172,7 +172,7 @@ export function installMock(params) {
   const md = navigator.mediaDevices || (navigator.mediaDevices = {});
   const realGum = md.getUserMedia ? md.getUserMedia.bind(md) : null;
   md.getUserMedia = async (c) => {
-    if (realGum && params.get('realmic') === '1') return realGum(c);
+    if (realGum && (params.get('realmic') === '1' || (c && c.video))) return realGum(c); // the synthetic stream is audio only
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -183,4 +183,126 @@ export function installMock(params) {
     osc.start();
     return dest.stream;
   };
+}
+
+// ---------------------------------------------------------------------------------------------
+// Mock camera: scripted pose / hand-label sequences that go through the SAME gesture engine as a
+// real camera (?cam=mock). Pure data generators: no DOM, no network (also used by the tests).
+// Raw camera coordinates: x right, y down, the person's LEFT side is at larger x. Shoulder width 0.16.
+// ---------------------------------------------------------------------------------------------
+function rng32(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+export const MOCK_SW = 0.16;
+const BASE = {
+  nose: [0.5, 0.30], ls: [0.58, 0.45], rs: [0.42, 0.45], le: [0.60, 0.58], re: [0.40, 0.58], lw: [0.60, 0.70], rw: [0.40, 0.70], lh: [0.56, 0.85], rh: [0.44, 0.85],
+};
+
+// o: { dy, scale, noseDx, lw:[x,y], rw:[x,y], le, re, shDx } -> 33 landmarks {x, y, visibility}
+export function standingPose(o = {}) {
+  const dy = o.dy || 0, sc = o.scale || 1, shDx = o.shDx || 0;
+  const tilt = o.tilt || 0; // > 0: the person's LEFT shoulder drops (shoulder line tilts), used by the Copy me dance
+  const sh = (p, dx = 0) => [0.5 + (p[0] - 0.5) * sc + dx, 0.45 + (p[1] - 0.45) * sc + dy];
+  const pt = (p, v = 1) => ({ x: p[0], y: p[1], visibility: v });
+  const nose = sh(BASE.nose, (o.noseDx || 0));
+  const ls = sh(BASE.ls, shDx), rs = sh(BASE.rs, shDx);
+  if (tilt) { ls[1] += tilt; rs[1] -= tilt; }
+  const lw = o.lw ? [o.lw[0], o.lw[1] + dy] : sh(BASE.lw, shDx);
+  const rw = o.rw ? [o.rw[0], o.rw[1] + dy] : sh(BASE.rw, shDx);
+  const le = o.le ? [o.le[0], o.le[1] + dy] : sh(BASE.le, shDx);
+  const re = o.re ? [o.re[0], o.re[1] + dy] : sh(BASE.re, shDx);
+  const lm = Array.from({ length: 33 }, () => pt(nose, 0.5));
+  const set = (i, p, v = 1) => { lm[i] = pt(p, v); };
+  set(0, nose);
+  set(1, [nose[0] + 0.015, nose[1] - 0.02]); set(2, [nose[0] + 0.03, nose[1] - 0.02]); set(3, [nose[0] + 0.045, nose[1] - 0.015]);
+  set(4, [nose[0] - 0.015, nose[1] - 0.02]); set(5, [nose[0] - 0.03, nose[1] - 0.02]); set(6, [nose[0] - 0.045, nose[1] - 0.015]);
+  set(7, [nose[0] + 0.07, nose[1]]); set(8, [nose[0] - 0.07, nose[1]]); set(9, [nose[0] + 0.015, nose[1] + 0.04]); set(10, [nose[0] - 0.015, nose[1] + 0.04]);
+  set(11, ls); set(12, rs); set(13, le); set(14, re); set(15, lw); set(16, rw);
+  set(17, [lw[0] + 0.01, lw[1] + 0.03]); set(18, [rw[0] - 0.01, rw[1] + 0.03]); set(19, [lw[0] + 0.02, lw[1] + 0.025]); set(20, [rw[0] - 0.02, rw[1] + 0.025]);
+  set(21, [lw[0] - 0.01, lw[1] + 0.02]); set(22, [rw[0] + 0.01, rw[1] + 0.02]);
+  set(23, [BASE.lh[0], BASE.lh[1] + dy], 0.9); set(24, [BASE.rh[0], BASE.rh[1] + dy], 0.9);
+  set(25, [0.57, 1.12 + dy], 0.1); set(26, [0.43, 1.12 + dy], 0.1); set(27, [0.57, 1.3 + dy], 0.05); set(28, [0.43, 1.3 + dy], 0.05);
+  set(29, [0.58, 1.32 + dy], 0.05); set(30, [0.42, 1.32 + dy], 0.05); set(31, [0.59, 1.35 + dy], 0.05); set(32, [0.41, 1.35 + dy], 0.05);
+  return lm;
+}
+
+const TAU = Math.PI * 2;
+const ease = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+// Scene definitions: dur (ms of the action), rest (ms of standing before it, enough history for jump/squat),
+// pose(tSec, amp) -> standingPose options, hands(tSec) -> label list. `amp` scales the key movement (0.2 = a near miss).
+export const MOCK_SCENES = {
+  wave: { dur: 2400, rest: 800, pose: (t, a) => ({ rw: [0.40 + Math.sin(TAU * 2.2 * t) * 0.045 * a, 0.38 - ease(t / 0.3) * 0.0], re: [0.38, 0.47] }) },
+  hands_up: { dur: 1800, rest: 800, pose: (t, a) => { const k = ease(t / 0.4) * a; return { lw: [0.62, 0.70 - 0.55 * k], rw: [0.38, 0.70 - 0.55 * k], le: [0.62, 0.58 - 0.3 * k], re: [0.38, 0.58 - 0.3 * k] }; } },
+  hand_up_left: { dur: 1800, rest: 800, pose: (t, a) => { const k = ease(t / 0.4) * a; return { lw: [0.63, 0.70 - 0.56 * k], le: [0.62, 0.58 - 0.25 * k] }; } },
+  hand_up_right: { dur: 1800, rest: 800, pose: (t, a) => { const k = ease(t / 0.4) * a; return { rw: [0.37, 0.70 - 0.56 * k], re: [0.38, 0.58 - 0.25 * k] }; } },
+  t_pose: { dur: 2200, rest: 800, pose: (t, a) => { const k = ease(t / 0.5) * a; return { lw: [0.60 + 0.28 * k, 0.70 - 0.25 * k], rw: [0.40 - 0.28 * k, 0.70 - 0.25 * k], le: [0.60 + 0.14 * k, 0.58 - 0.13 * k], re: [0.40 - 0.14 * k, 0.58 - 0.13 * k] }; } },
+  clap: { dur: 1500, rest: 800, pose: (t, a) => { const g = ease(t / 0.3); const x = 0.10 * a * (0.5 + 0.5 * Math.cos(TAU * 2 * t)); const y = 0.70 - 0.15 * g; return { lw: [0.5 + x, y], rw: [0.5 - x, y], le: [0.57, 0.6], re: [0.43, 0.6] }; } },
+  lean_left: { dur: 1800, rest: 800, pose: (t, a) => ({ noseDx: 0.12 * ease(t / 0.4) * a, shDx: 0.02 * ease(t / 0.4) * a }) },
+  lean_right: { dur: 1800, rest: 800, pose: (t, a) => ({ noseDx: -0.12 * ease(t / 0.4) * a, shDx: -0.02 * ease(t / 0.4) * a }) },
+  jump: { dur: 1500, rest: 2200, pose: (t, a) => ({ dy: t < 0.6 ? -0.10 * Math.sin(Math.PI * t / 0.6) * a : 0 }) },
+  belly_rub: { dur: 2200, rest: 800, pose: (t, a) => { const k = ease(t / 0.3), r = 0.045 * a, c = [0.47, 0.75]; return { rw: [0.40 + (c[0] + Math.cos(TAU * 2.2 * t) * r - 0.40) * k, 0.70 + (c[1] + Math.sin(TAU * 2.2 * t) * r - 0.70) * k], re: [0.42, 0.62] }; } },
+  squat: { dur: 2200, rest: 3600, pose: (t, a) => ({ dy: 0.12 * a * ease(t / 0.7) * (t < 1.6 ? 1 : 1 - ease((t - 1.6) / 0.5)) }) },
+};
+// ---- "Copy me" dance: held poses with a 0.3 s ease-in, standing in between. Names start with d_ (the others are reused as they are). ----
+const ARM_UP = (side, k) => (side === 'r' ? { rw: [0.37, 0.70 - 0.56 * k], re: [0.38, 0.58 - 0.25 * k] } : { lw: [0.63, 0.70 - 0.56 * k], le: [0.62, 0.58 - 0.25 * k] });
+export const DANCE_SCENES = {
+  d_stand: { dur: 2600, rest: 0, pose: () => ({}) },
+  d_right_hand: { dur: 2200, rest: 300, pose: (t) => ARM_UP('r', ease(t / 0.4)) },
+  d_left_hand: { dur: 2200, rest: 300, pose: (t) => ARM_UP('l', ease(t / 0.4)) },
+  d_both_up: { dur: 2200, rest: 300, pose: (t) => { const k = ease(t / 0.4); return { lw: [0.62, 0.70 - 0.58 * k], rw: [0.38, 0.70 - 0.58 * k], le: [0.62, 0.58 - 0.3 * k], re: [0.38, 0.58 - 0.3 * k] }; } },
+  d_t_pose: { dur: 2200, rest: 300, pose: (t) => { const k = ease(t / 0.5); return { lw: [0.60 + 0.28 * k, 0.70 - 0.25 * k], rw: [0.40 - 0.28 * k, 0.70 - 0.25 * k], le: [0.60 + 0.14 * k, 0.58 - 0.13 * k], re: [0.40 - 0.14 * k, 0.58 - 0.13 * k] }; } },
+  d_lean_left: { dur: 2200, rest: 300, pose: (t) => ({ tilt: 0.035 * ease(t / 0.4), shDx: 0.03 * ease(t / 0.4), noseDx: 0.05 * ease(t / 0.4) }) },
+  d_lean_right: { dur: 2200, rest: 300, pose: (t) => ({ tilt: -0.035 * ease(t / 0.4), shDx: -0.03 * ease(t / 0.4), noseDx: -0.05 * ease(t / 0.4) }) },
+  d_squat: { dur: 2200, rest: 300, pose: (t) => ({ dy: 0.12 * ease(t / 0.6) * (t < 1.7 ? 1 : 1 - ease((t - 1.7) / 0.5)) }) },
+};
+export const DANCE_ORDER = ['d_stand', 'd_right_hand', 'd_left_hand', 'd_both_up', 'd_t_pose', 'd_lean_left', 'd_lean_right', 'd_squat', 'jump', 'clap', 'wave', 'thumbs_up', 'peace', 'fist', 'open_palm', 'point_up'];
+export const DANCE_CAPTIONS = {
+  d_stand: 'Stand still (calibrating)', d_right_hand: 'Raise right hand', d_left_hand: 'Raise left hand', d_both_up: 'Both hands up', d_t_pose: 'T-pose, arms wide',
+  d_lean_left: 'Lean left', d_lean_right: 'Lean right', d_squat: 'Squat', jump: 'Jump', clap: 'Clap', wave: 'Wave', thumbs_up: 'Thumbs up', peace: 'Peace sign', fist: 'Fist', open_palm: 'Open palm', point_up: 'Point up',
+};
+const sceneOf = (name) => MOCK_SCENES[name] || DANCE_SCENES[name];
+
+const HAND_SCENES = { thumbs_up: 'Thumb_Up', thumbs_down: 'Thumb_Down', peace: 'Victory', open_palm: 'Open_Palm', fist: 'Closed_Fist', point_up: 'Pointing_Up', i_love_you: 'ILoveYou' };
+for (const [g, label] of Object.entries(HAND_SCENES)) MOCK_SCENES[g] = { dur: 1700, rest: 700, pose: () => ({}), hands: () => [{ label, score: 0.93 }] };
+export const MOCK_ORDER = ['wave', 'hands_up', 'hand_up_left', 'hand_up_right', 't_pose', 'clap', 'lean_left', 'lean_right', 'jump', 'squat', 'belly_rub', 'thumbs_up', 'thumbs_down', 'peace', 'open_palm', 'fist', 'point_up', 'i_love_you'];
+
+// Frames of one scene: [{ts, pose, hands}] starting at ts = t0, restMs of standing first. noise = sigma on x/y.
+export function buildScene(name, { t0 = 0, fps = 15, amp = 1, noise = 0, seed = 1, rest, tail = 500, handEvery = 2 } = {}) {
+  const sc = sceneOf(name);
+  const rand = rng32(seed);
+  const gauss = () => { let u = 0; for (let i = 0; i < 6; i++) u += rand(); return (u - 3) / 0.7071; }; // ~N(0,1)
+  const frames = [];
+  const restMs = rest == null ? sc.rest : rest;
+  const total = restMs + sc.dur + tail, step = 1000 / fps;
+  for (let k = 0, t = 0; t <= total; k++, t = k * step) {
+    const active = t >= restMs && t <= restMs + sc.dur;
+    const ts = Math.round((t0 + t) * 100) / 100;
+    const o = active ? sc.pose((t - restMs) / 1000, amp) : {};
+    let pose = standingPose(o);
+    if (noise) pose = pose.map((p) => ({ ...p, x: p.x + gauss() * noise, y: p.y + gauss() * noise }));
+    let hands;
+    if (k % handEvery === 0) hands = active && sc.hands ? sc.hands((t - restMs) / 1000) : [];
+    frames.push({ ts, pose, hands });
+  }
+  return { frames, restMs, durMs: sc.dur, endTs: t0 + total };
+}
+
+// Whole timeline for ?cam=mock: every gesture in turn (a visible schedule for the UI).
+export function buildTimeline(order = MOCK_ORDER) {
+  let t = 0; const items = [];
+  for (const name of order) {
+    const s = sceneOf(name);
+    items.push({ name, start: t, actionStart: t + s.rest, end: t + s.rest + s.dur + 500 });
+    t += s.rest + s.dur + 500;
+  }
+  return { items, totalMs: t };
+}
+export function mockFrameAt(timeline, tMs, fps = 15) {
+  const total = timeline.totalMs;
+  const t = ((tMs % total) + total) % total;
+  const it = timeline.items.find((x) => t >= x.start && t < x.end) || timeline.items[0];
+  const sc = sceneOf(it.name);
+  const local = t - it.start, active = local >= sc.rest && local <= sc.rest + sc.dur;
+  const pose = standingPose(active ? sc.pose((local - sc.rest) / 1000, 1) : {});
+  const hands = active && sc.hands ? sc.hands() : [];
+  return { item: it, pose, hands, active, local };
 }

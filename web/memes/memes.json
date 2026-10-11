@@ -1,0 +1,107 @@
+{
+ "_comment": "Gesture -> list of meme entries; \"any\" = usable by every gesture. type \"image\": src is relative to web/memes/ (png/jpg/webp/avif/svg), caption is read out by screen readers, sound: none boom airhorn bruh violin scratch ding buzzer wow, optional centered/noJitter. type \"card\": a text-only fallback card (caption up to 28 chars, no emoji). A missing file is skipped silently. Regenerate the starter PNGs with scripts/make_meme_pngs.py (captions in web/memes/captions.js). You are responsible for the rights to any image you add; web/memes/images/ is git-ignored.",
+ "jump": [
+  {"type": "image", "src": "png/siuuuu.png", "caption": "SIUUUU", "sound": "airhorn"},
+  {"type": "image", "src": "png/lets-goooo.png", "caption": "LET'S GOOOO", "sound": "airhorn"},
+  {"type": "image", "src": "png/th-wow-sa.png", "caption": "ว้าวซ่า", "sound": "wow"},
+  {"type": "image", "src": "png/fly-high.png", "caption": "FLY HIGH", "sound": "wow"}
+ ],
+ "hands_up": [
+  {"type": "image", "src": "png/lets-goooo.png", "caption": "LET'S GOOOO", "sound": "airhorn"},
+  {"type": "image", "src": "png/th-pang-mak.png", "caption": "ปังมาก", "sound": "ding"},
+  {"type": "image", "src": "png/gg-ez.png", "caption": "GG EZ", "sound": "boom"},
+  {"type": "image", "src": "png/six-seven.png", "caption": "SIX SEVEN", "sound": "boom"}
+ ],
+ "t_pose": [
+  {"type": "image", "src": "png/t-pose.png", "caption": "T-POSE TO ASSERT DOMINANCE", "sound": "boom"},
+  {"type": "image", "src": "png/plus-1000-aura.png", "caption": "+1000 AURA", "sound": "ding"},
+  {"type": "image", "src": "png/lock-in.png", "caption": "LOCK IN", "sound": "boom"}
+ ],
+ "clap": [
+  {"type": "image", "src": "png/gg-ez.png", "caption": "GG EZ", "sound": "ding"},
+  {"type": "image", "src": "png/th-55555.png", "caption": "555555", "sound": "boom"},
+  {"type": "image", "src": "png/th-ngan-di.png", "caption": "งานดี", "sound": "ding"},
+  {"type": "image", "src": "png/bark.png", "caption": "BARK", "sound": "boom"}
+ ],
+ "wave": [
+  {"type": "image", "src": "png/sheesh.png", "caption": "SHEESH", "sound": "wow"},
+  {"type": "image", "src": "png/hello.png", "caption": "HELLO??", "sound": "boom"},
+  {"type": "image", "src": "png/bzzzz.png", "caption": "BZZZZ", "sound": "wow"}
+ ],
+ "thumbs_up": [
+  {"type": "image", "src": "png/plus-1000-aura.png", "caption": "+1000 AURA", "sound": "ding"},
+  {"type": "image", "src": "png/th-pang-mak.png", "caption": "ปังมาก", "sound": "ding"},
+  {"type": "image", "src": "png/based.png", "caption": "BASED", "sound": "boom"},
+  {"type": "image", "src": "png/rizz-max.png", "caption": "RIZZ MAX", "sound": "ding"},
+  {"type": "image", "src": "png/no-cap.png", "caption": "NO CAP FR FR", "sound": "boom"}
+ ],
+ "thumbs_down": [
+  {"type": "image", "src": "images/son/son-son-meme.png", "caption": "Son", "sound": "violin"},
+  {"type": "image", "src": "png/bruh.png", "caption": "BRUH", "sound": "bruh"},
+  {"type": "image", "src": "png/l-ratio.png", "caption": "L + RATIO", "sound": "buzzer"},
+  {"type": "image", "src": "png/minus-1000-aura.png", "caption": "-1000 AURA", "sound": "buzzer"}
+ ],
+ "peace": [
+  {"type": "image", "src": "png/sigma.png", "caption": "SIGMA", "sound": "boom"},
+  {"type": "image", "src": "png/peace.png", "caption": "PEACE", "sound": "ding"},
+  {"type": "image", "src": "png/th-jueng-a.png", "caption": "จึ้งอ่ะ", "sound": "ding"},
+  {"type": "image", "src": "png/delulu.png", "caption": "DELULU IS THE SOLULU", "sound": "wow"}
+ ],
+ "fist": [
+  {"type": "image", "src": "png/cooked.png", "caption": "COOKED", "sound": "boom"},
+  {"type": "image", "src": "png/crashout.png", "caption": "CRASHOUT", "sound": "buzzer"},
+  {"type": "image", "src": "png/th-teung-mak.png", "caption": "ตึงมาก", "sound": "boom"},
+  {"type": "image", "src": "png/sus.png", "caption": "SUS", "sound": "bruh"}
+ ],
+ "point_up": [
+  {"type": "image", "src": "png/well-actually.png", "caption": "WELL ACTUALLY", "sound": "scratch"},
+  {"type": "image", "src": "png/th-tam-noi.png", "caption": "ถามหน่อย", "sound": "scratch"},
+  {"type": "image", "src": "png/no-cap.png", "caption": "NO CAP FR FR", "sound": "scratch"},
+  {"type": "image", "src": "png/th-arai-khong-ther.png", "caption": "อะไรของเธอ", "sound": "scratch"}
+ ],
+ "open_palm": [
+  {"type": "image", "src": "png/talk-to-the-hand.png", "caption": "TALK TO THE HAND", "sound": "scratch"},
+  {"type": "image", "src": "png/th-jai-yen.png", "caption": "ใจเย็นๆ", "sound": "none"},
+  {"type": "image", "src": "png/touch-grass.png", "caption": "TOUCH GRASS", "sound": "bruh"}
+ ],
+ "i_love_you": [
+  {"type": "image", "src": "png/th-fin-wer.png", "caption": "ฟินเว่อร์", "sound": "ding"},
+  {"type": "image", "src": "png/rock-on.png", "caption": "ROCK ON", "sound": "airhorn"},
+  {"type": "image", "src": "png/th-kheen-a.png", "caption": "เขินอ่ะ", "sound": "ding"},
+  {"type": "image", "src": "png/delulu.png", "caption": "DELULU IS THE SOLULU", "sound": "wow"}
+ ],
+ "squat": [
+  {"type": "image", "src": "png/skill-issue.png", "caption": "SKILL ISSUE", "sound": "buzzer"},
+  {"type": "image", "src": "png/th-mai-wai-laeo.png", "caption": "ไม่ไหวแล้ววว", "sound": "violin"},
+  {"type": "image", "src": "images/son/son-son-meme.png", "caption": "Son", "sound": "violin"},
+  {"type": "image", "src": "png/th-tai-laeo.png", "caption": "ตายแล้ว", "sound": "bruh"}
+ ],
+ "lean_left": [
+  {"type": "image", "src": "png/mewing.png", "caption": "MEWING", "sound": "wow"},
+  {"type": "image", "src": "png/npc-moment.png", "caption": "NPC MOMENT", "sound": "bruh"},
+  {"type": "image", "src": "png/lock-in.png", "caption": "LOCK IN", "sound": "none"}
+ ],
+ "lean_right": [
+  {"type": "image", "src": "png/mewing.png", "caption": "MEWING", "sound": "wow"},
+  {"type": "image", "src": "png/npc-moment.png", "caption": "NPC MOMENT", "sound": "bruh"},
+  {"type": "image", "src": "png/fly-has-spoken.png", "caption": "THE FLY HAS SPOKEN", "sound": "boom"}
+ ],
+ "hand_up_left": [
+  {"type": "image", "src": "png/th-tam-noi.png", "caption": "ถามหน่อย", "sound": "scratch"},
+  {"type": "image", "src": "png/im-a-let-you-finish.png", "caption": "I'MA LET YOU FINISH BUT THE FLY HAD THE BEST ANSWER OF ALL TIME", "sound": "scratch"},
+  {"type": "image", "src": "png/th-laew-ngai-tor.png", "caption": "แล้วไงต่อ", "sound": "bruh"}
+ ],
+ "hand_up_right": [
+  {"type": "image", "src": "png/th-tam-noi.png", "caption": "ถามหน่อย", "sound": "scratch"},
+  {"type": "image", "src": "png/im-a-let-you-finish.png", "caption": "I'MA LET YOU FINISH BUT THE FLY HAD THE BEST ANSWER OF ALL TIME", "sound": "scratch"},
+  {"type": "image", "src": "png/only-in-ohio.png", "caption": "ONLY IN OHIO", "sound": "bruh"},
+  {"type": "image", "src": "png/hood-classic.png", "caption": "HOOD CLASSIC", "sound": "boom"}
+ ],
+ "belly_rub": [
+  {"type": "image", "src": "png/belly-man.png", "caption": "Pregnant man", "sound": "wow", "centered": true, "noJitter": true}
+ ],
+ "any": [
+  {"type": "image", "src": "images/son/images.jpg", "caption": "Son?", "sound": "violin"},
+  {"type": "image", "src": "images/son/imagescharlie.jpg", "caption": "son", "sound": "violin"}
+ ]
+}

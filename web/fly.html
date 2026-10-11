@@ -31,6 +31,7 @@
         <option value="2" selected>กวนสุด ๆ</option>
       </select>
     </div>
+    <div class="mock-caption" id="mock-caption" hidden role="status"></div>
   </div>
   <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
   <a class="model-credit" href="https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd" target="_blank" rel="noopener noreferrer">Housefly · Schmoldt5000 / schmoldt.art · CC BY 4.0</a>
@@ -38,9 +39,28 @@
   <section class="panel you" aria-labelledby="you-title">
     <h2 id="you-title">ถามแมลงวัน</h2>
     <p class="hint">บอกสองตัวเลือกกับสิ่งที่สำคัญ แล้วให้แมลงวันช่วยเลือก</p>
-    <div class="seg" role="tablist" aria-label="Input mode">
-      <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">พิมพ์ข้อความ</button>
-      <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">ใช้เสียง</button>
+    <div class="mode-row">
+      <div class="seg" role="tablist" aria-label="Input mode">
+        <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">พิมพ์ข้อความ</button>
+        <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">ใช้เสียง</button>
+      </div>
+      <button type="button" class="cam-toggle" id="cam-toggle" aria-pressed="false" title="เปิดกล้องให้แมลงวันเห็นท่าทางและแสดงมีม">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z"/></svg>
+        <span id="cam-toggle-label">เปิดกล้อง</span>
+      </button>
+    </div>
+    <p class="cam-status" id="cam-status" role="status" aria-live="polite" hidden></p>
+    <div class="cam-box" id="cam-box" hidden role="group" aria-label="ภาพจากกล้อง">
+      <div class="cam-view" id="cam-view">
+        <video id="cam-video" playsinline muted></video>
+        <canvas id="cam-overlay" width="320" height="240" aria-hidden="true"></canvas>
+        <span class="cam-on" id="cam-on"><i></i>เปิดกล้องอยู่</span>
+        <span class="cam-mockbadge" id="cam-mockbadge" hidden>กล้องจำลอง</span>
+      </div>
+      <div class="cam-line"><span id="cam-fps">0 fps</span><span id="cam-mode" class="cam-mode"></span><button type="button" class="mini cam-stop" id="cam-stop">ปิดกล้อง</button></div>
+      <div class="cam-last" id="cam-last">ยังไม่พบท่าทาง</div>
+      <ol class="cam-timeline" id="cam-timeline" hidden aria-label="ลำดับท่าทางจำลอง"></ol>
+      <div class="cam-note">ประมวลผลในเบราว์เซอร์ ไม่อัปโหลดหรือบันทึกภาพ</div>
     </div>
 
     <div id="pane-text" role="tabpanel" aria-labelledby="tab-text">
@@ -73,6 +93,45 @@
         </span>
       </div>
     </div>
+
+    <div class="mimic" id="mimic" role="group" aria-label="ทำท่าตามฉัน">
+      <label class="check mimic-main"><input type="checkbox" id="mimic-on"> <b>ทำท่าตามฉัน</b> <span class="mimic-sub">ให้แมลงวันขยับตามท่าทางของคุณ</span></label>
+      <span class="mimic-status" id="mimic-status" role="status" aria-live="polite"></span>
+      <div class="mimic-opts" id="mimic-opts" hidden>
+        <label class="check"><input type="checkbox" id="mimic-mirror" checked> กระจกเงา</label>
+        <label class="mimic-smooth" for="mimic-smooth">ความลื่นไหล <input type="range" id="mimic-smooth" min="0" max="100" step="5" value="50"></label>
+        <button type="button" class="mini" id="mimic-recal" title="ยืนนิ่งสักครู่เพื่อวัดท่าทางเริ่มต้นใหม่">ตั้งท่าใหม่</button>
+      </div>
+    </div>
+    <details class="cam-actions" id="cam-actions">
+      <summary>ตั้งค่าท่าทางและมีม</summary>
+      <div class="cam-actions-body">
+        <div class="cam-opt">
+          <label for="cam-sens">ความไว</label>
+          <select id="cam-sens"><option value="low">ต่ำ</option><option value="normal" selected>ปกติ</option><option value="high">สูง</option></select>
+        </div>
+        <label class="check cam-ask"><input type="checkbox" id="cam-ask"> ให้ท่าทางส่งคำถาม (มีค่าใช้จ่าย)</label>
+        <p class="cam-hint" id="cam-ask-hint">ส่งคำถามเมื่อค้างท่า 0.8 วินาที เว้นอย่างน้อย 10 วินาทีต่อคำถาม มีค่าใช้บริการโมเดล</p>
+        <div class="cam-opt">
+          <label for="meme-speed">ความเร็วมีม</label>
+          <select id="meme-speed"><option value="normal" selected>ปกติ</option><option value="fast">เร็ว</option><option value="ultra">เร็วสุด</option></select>
+        </div>
+        <div class="cam-rows" id="cam-rows" role="list"></div>
+        <p class="cam-hint">มีมแสดงเป็นภาพสั้น ๆ ไม่เกิน 2 ครั้งต่อวินาที ปุ่มลองท่าใช้ได้โดยไม่เปิดกล้องและไม่ส่งคำถาม</p>
+        <div class="meme-user-opts">
+          <div class="cam-opt">
+            <button type="button" class="mini" id="meme-add">เพิ่มมีม</button>
+            <button type="button" class="mini" id="meme-export" title="ดาวน์โหลดรายการมีมเป็น JSON">ส่งออกรายการ</button>
+            <input type="file" id="meme-file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+          </div>
+          <p class="cam-hint" id="meme-user-hint">ลากภาพ PNG, JPG หรือ WebP มาวางได้ สูงสุด 40 ไฟล์ ไฟล์ละ 2 MB เก็บเฉพาะในเบราว์เซอร์นี้</p>
+          <label class="check"><input type="checkbox" id="meme-media"> อนุญาตมีม GIF / วิดีโอ / เสียง</label>
+          <p class="meme-warn" id="meme-media-warn" hidden>คลิปเคลื่อนไหวอาจมีแสงกะพริบที่กระตุ้นอาการชักในผู้ไวต่อแสง เปิดเมื่อเหมาะกับผู้ชมเท่านั้น คลิปแสดงไม่เกิน 1.5 วินาที</p>
+          <p class="cam-hint" id="meme-user-status" role="status" aria-live="polite"></p>
+          <div class="meme-thumbs" id="meme-thumbs"></div>
+        </div>
+      </div>
+    </details>
   </section>
 
   <section class="panel out" id="out" aria-labelledby="out-title">
@@ -135,7 +194,17 @@
       <div class="rawpane" id="rawpane" role="tabpanel" tabindex="0" aria-label="Raw JSON"></div>
     </div>
   </section>
+    <div class="meme-layer" id="meme-layer"><span class="sr-only" id="meme-live" role="status" aria-live="polite"></span></div>
 </main>
 <script type="module" src="/static/fly.js"></script>
+  <dialog class="meme-dialog" id="meme-dialog" aria-labelledby="meme-dialog-title">
+    <form method="dialog" id="meme-dialog-form">
+      <h2 id="meme-dialog-title" style="font-size:1rem;margin:0 0 4px">ให้มีมนี้แสดงเมื่อทำท่าไหน?</h2>
+      <p class="cam-hint" id="meme-dialog-files"></p>
+      <label class="check"><input type="checkbox" id="meme-any" checked> ทุกท่าทาง</label>
+      <div class="g-list" id="meme-glist"></div>
+      <div class="row"><button type="button" class="mini" id="meme-cancel">ยกเลิก</button><button type="submit" class="mini" id="meme-save" value="save">เพิ่ม</button></div>
+    </form>
+  </dialog>
 </body>
 </html>

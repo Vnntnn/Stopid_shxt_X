@@ -290,3 +290,29 @@ test('ducking: master gain drops to <= 8% while recording, blocks voice/jingles,
   engine.setMuted(true); engine.setDucked(true); engine.setDucked(false); assert.equal(master.gain.value, 0, 'mute still wins');
   engine.stopAll();
 });
+
+test('playBoom: level >= 1 only, and silent when muted, ducked or before unlock', async () => {
+  const { f, engine } = await make();
+  assert.equal(engine.playBoom(), false);                 // locked: nothing created
+  engine.unlock();
+  engine.setLevel(0); let n = f.all.length; assert.equal(engine.playBoom(), false); assert.equal(f.all.length, n);
+  engine.setLevel(1); n = f.all.length; assert.equal(engine.playBoom(), true); assert.ok(f.all.length > n);
+  engine.setMuted(true); n = f.all.length; assert.equal(engine.playBoom(), false); assert.equal(f.all.length, n);
+  engine.setMuted(false); engine.setDucked(true); n = f.all.length; assert.equal(engine.playBoom(), false); assert.equal(f.all.length, n);
+  engine.setDucked(false); engine.setLevel(2); assert.equal(engine.playBoom(), true);
+  engine.stopAll();
+});
+
+test('playMeme: every meme sound plays at level >= 1, honours mute / ducking / level 0, unknown names are silent', async () => {
+  const { f, engine } = await make();
+  assert.deepEqual([...engine.MEME_SOUNDS].sort(), ['airhorn', 'boom', 'bruh', 'buzzer', 'ding', 'scratch', 'violin', 'wow']);
+  assert.equal(engine.playMeme('airhorn'), false);        // locked
+  engine.unlock(); engine.setLevel(1);
+  for (const n of engine.MEME_SOUNDS) { const c = f.all.length; assert.equal(engine.playMeme(n), true, n); assert.ok(f.all.length > c, n); }
+  for (const bad of ['none', 'nope', undefined, null, '__proto__']) { const c = f.all.length; assert.equal(engine.playMeme(bad), false); assert.equal(f.all.length, c); }
+  engine.setLevel(0); assert.equal(engine.playMeme('ding'), false);
+  engine.setLevel(2); engine.setMuted(true); assert.equal(engine.playMeme('ding'), false);
+  engine.setMuted(false); engine.setDucked(true); assert.equal(engine.playMeme('buzzer'), false);
+  engine.setDucked(false); assert.equal(engine.playMeme('buzzer'), true);
+  engine.stopAll();
+});

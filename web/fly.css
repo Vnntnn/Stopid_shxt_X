@@ -332,3 +332,109 @@ a.srcchip:hover { background: #e8d6e6; }
 .jl { color: #493620; }
 .j-key { color: #355780; } .j-str { color: #70417c; } .j-num { color: #8b681b; } .j-bool { color: #72589a; } .j-null { color: #a14d52; }
 button.jcaret:hover { background: #eee2c5; }
+
+/* ---- Camera (gestures + memes) ---- */
+.mode-row { display: flex; align-items: flex-start; gap: 10px; flex-wrap: wrap; }
+.mode-row .seg { margin-bottom: 8px; }
+.cam-toggle { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 5px 14px; margin-bottom: 8px; }
+.cam-toggle[aria-pressed="true"] { background: #e5484d; border-color: #ff9a9d; color: #fff; font-weight: 600; }
+.cam-status { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); overflow-wrap: anywhere; }
+.cam-status.bad { color: #ffc0c0; }
+.cam-actions { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 6px; }
+.cam-actions > summary { cursor: pointer; color: var(--muted); font-size: 13px; font-weight: 600; }
+.cam-actions-body { margin-top: 6px; max-height: min(38vh, 360px); overflow: auto; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255,255,255,.35) transparent; }
+.cam-opt { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted); margin-bottom: 6px; }
+.cam-actions select { font: inherit; font-size: 12.5px; color: var(--text); background: rgba(0,0,0,.4); border: 1.5px solid var(--line); border-radius: 8px; padding: 2px 4px; max-width: 100%; }
+.cam-ask { display: flex; font-size: 12.5px; color: var(--text); }
+.cam-hint { margin: 2px 0 8px; font-size: 11.5px; color: var(--muted); }
+.cam-hint.warn { color: #ffd479; }
+.cam-rows { display: grid; gap: 4px; }
+.cam-row { display: grid; grid-template-columns: minmax(70px, 1fr) auto minmax(0, 1.4fr) auto; gap: 6px; align-items: center; font-size: 12.5px; padding: 2px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+.cam-row .gname { overflow-wrap: anywhere; }
+.cam-row label { display: inline-flex; align-items: center; gap: 4px; color: var(--muted); }
+.cam-row select { min-width: 0; }
+.cam-row button.mini { padding: 1px 9px; }
+
+.cam-box { position: absolute; left: 16px; top: 16px; z-index: 4; width: 212px; background: var(--panel); border: 1.5px solid var(--line); border-radius: 14px; padding: 6px; backdrop-filter: blur(6px); font-size: 12px; }
+.cam-view { position: relative; width: 100%; aspect-ratio: 4 / 3; border-radius: 10px; overflow: hidden; background: #0a0e20 radial-gradient(ellipse at 50% 40%, #1b2650, #0a0e20); }
+.cam-view video, .cam-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* mirrored like a mirror */
+.cam-on { position: absolute; left: 6px; top: 6px; display: inline-flex; align-items: center; gap: 5px; background: #e5484d; color: #fff; font-weight: 700; font-size: 11px; letter-spacing: .06em; padding: 1px 8px 1px 6px; border-radius: 999px; }
+.cam-on i { width: 8px; height: 8px; border-radius: 50%; background: #fff; display: inline-block; }
+.cam-mockbadge { position: absolute; right: 6px; bottom: 6px; background: #ffe14d; color: #231a00; font-weight: 800; font-size: 10.5px; letter-spacing: .06em; padding: 1px 8px; border-radius: 6px; }
+.cam-line { display: flex; align-items: center; gap: 8px; margin-top: 5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.cam-mode { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cam-last { margin-top: 3px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+.cam-note { margin-top: 3px; font-size: 10.5px; color: var(--muted); }
+.cam-timeline { list-style: none; margin: 5px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 3px; }
+.cam-timeline li { font-size: 9.5px; padding: 0 5px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); }
+.cam-timeline li.now { background: var(--accent); color: #04140c; border-color: var(--accent); font-weight: 700; }
+.cam-timeline li.done { color: var(--text); border-color: rgba(141,255,196,.5); }
+
+/* Meme PNG slaps. PHOTOSENSITIVITY: one static image at a time (two in ULTRA), never full-screen, appears and disappears instantly
+   (no fade, no scale, no animation), rate-limited in JS (at most 2 starts per second). It sits above everything on purpose. */
+.meme-layer { position: fixed; inset: 0; pointer-events: none; z-index: 10000; overflow: hidden; }
+.meme-slap { position: absolute; display: block; pointer-events: none; user-select: none; -webkit-user-drag: none; object-fit: contain; filter: brightness(.88); transform-origin: 50% 50%; }
+.meme-card { display: grid; place-items: center; text-align: center; padding: .08em; border-radius: 18px; border: 4px solid rgba(255,255,255,.4); box-sizing: border-box; overflow: hidden;
+  font-family: "Liberation Sans", "Arial Black", "Noto Sans Thai", system-ui, sans-serif; font-weight: 900; text-transform: uppercase; color: #f6f1e6; line-height: 1.05;
+  -webkit-text-stroke: .1em #000; paint-order: stroke fill; overflow-wrap: anywhere; filter: none; }
+.meme-user-opts { display: grid; gap: 6px; margin-top: 6px; }
+.meme-thumbs { display: flex; flex-wrap: wrap; gap: 6px; }
+.meme-thumb { position: relative; width: 54px; height: 54px; border-radius: 8px; overflow: hidden; border: 1px solid var(--line, rgba(255,255,255,.2)); background: #111; }
+.meme-thumb img, .meme-thumb .clip { width: 100%; height: 100%; object-fit: cover; display: grid; place-items: center; font-size: .7rem; }
+.meme-thumb button { position: absolute; top: 0; right: 0; width: 20px; height: 20px; padding: 0; line-height: 1; border: 0; border-radius: 0 0 0 8px; background: rgba(0,0,0,.75); color: #fff; cursor: pointer; }
+.meme-dialog { max-width: min(92vw, 420px); border: 1px solid rgba(255,255,255,.25); border-radius: 14px; background: #10131f; color: #eef; padding: 14px; }
+.meme-dialog::backdrop { background: rgba(0,0,0,.6); }
+.meme-dialog .g-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 12px; margin: 8px 0; max-height: 40vh; overflow: auto; }
+.meme-dialog .row { display: flex; gap: 8px; justify-content: flex-end; }
+.meme-drop-hint { position: fixed; inset: 8px; z-index: 9000; border: 3px dashed #8dffc4; border-radius: 16px; background: rgba(8,20,16,.55); display: grid; place-items: center; font-weight: 700; color: #8dffc4; pointer-events: none; }
+.meme-warn { border: 1px solid #f59e0b; background: rgba(245,158,11,.12); border-radius: 8px; padding: 6px 8px; font-size: .8rem; }
+
+@media (max-width: 800px) {
+  .cam-box { width: 150px; left: 8px; top: 8px; padding: 4px; }
+  .cam-note, .cam-timeline { display: none; }
+  .cam-last { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .cam-box { width: 132px; }
+
+  .cam-row { grid-template-columns: minmax(60px, 1fr) auto minmax(0, 1.4fr) auto; }
+  .cam-actions-body { max-height: 50vh; }
+}
+
+/* ---- Copy me (mimic) ---- */
+.mimic { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.mimic-main { display: flex; font-size: 13.5px; color: var(--text); align-items: center; gap: 6px; flex-wrap: wrap; }
+.mimic-sub { color: var(--muted); font-size: 12px; }
+.mimic-status { font-size: 12.5px; color: var(--muted); min-height: 1.2em; }
+.mimic-status.on { color: #8dffc4; }
+.mimic-status.warn { color: #ffd479; }
+.mimic-opts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.mimic-opts[hidden] { display: none; }
+.mimic-smooth { display: inline-flex; align-items: center; gap: 6px; }
+.mimic-smooth input { width: 110px; }
+.mock-caption { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); z-index: 4; background: rgba(8,10,24,.82); border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 600; color: #ffe14d; pointer-events: none; white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.mock-caption[hidden] { display: none; }
+
+/* Camera controls follow main's ivory, gold and plum theme. The preview lives
+   inside the input panel so it never covers the fly or its landing flowers. */
+.you { max-height: calc(100% - 36px); overflow-y: auto; scrollbar-width: thin; }
+.cam-toggle[aria-pressed="true"], .cam-on { background: #70417c; border-color: #c7a265; color: #fff0ca; }
+.cam-status.bad { color: #ad4141; }
+.cam-actions select { background: #fff3d7; color: var(--text); border-color: #c7a265; }
+.cam-actions-body { scrollbar-color: #c7a265 transparent; }
+.cam-row { border-bottom-color: var(--line); }
+.cam-hint.warn, .mimic-status.warn { color: #846317; }
+.mimic-status.on { color: #623269; }
+.cam-box { position: relative; inset: auto; z-index: auto; width: 100%; margin: 0 0 10px;
+  background: #fff9e8; border-color: #c7a265; border-radius: 12px 6px 12px 6px; }
+.cam-box[hidden] { display: none; }
+.cam-view { width: min(180px, 100%); margin: auto; background: #291b32; }
+.cam-timeline li.now { color: #fff0ca; }
+.cam-timeline li.done { border-color: #b3872f; }
+.meme-dialog { background: #fff8e5; color: var(--text); border: 2px solid #c7a265;
+  box-shadow: 0 8px 28px rgba(87,47,20,.25), inset 0 0 0 3px #f3dfb2; border-radius: 24px 8px 24px 8px; }
+.meme-dialog::backdrop { background: rgba(41,27,50,.55); }
+.meme-drop-hint { border-color: #d2ac5d; background: rgba(41,27,50,.7); color: #fff0ca; }
+.mock-caption { background: #fff3d7; color: #70417c; border-color: #c7a265; }
+@media (max-width: 800px) {
+  .you { max-height: none; overflow: visible; }
+  .cam-box { width: 100%; inset: auto; }
+}

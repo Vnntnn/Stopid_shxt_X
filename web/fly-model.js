@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '/static/vendor/loaders/GLTFLoader.js';
+import { clampRig, wingAngles } from '/static/fly-mimic.js';
 
 export const FLY_SCALE = 1;
 
@@ -41,17 +42,33 @@ export async function loadFlyModel() {
   const flapRotation = new THREE.Quaternion();
   const foldRotation = new THREE.Quaternion();
   const legRotation = new THREE.Quaternion();
+  const poseRotation = new THREE.Quaternion();
+  const poseTarget = new THREE.Quaternion();
 
   return {
     model,
     landingHeight,
-    update({ flap, fold, t, landed, motion, state }) {
+    update({ flap, fold, t, landed, motion, state, rig, weight = 0, flapPhase = 0, extraFlap = 0 }) {
+      const W = THREE.MathUtils.clamp(Number.isFinite(weight) ? weight : 0, 0, 1);
+      const rg = clampRig(rig);
       for (const [side, sign] of [['l', 1], ['r', -1]]) {
+        // The author's anatomical left is +X (screen right when facing the camera).
+        const screenSide = side === 'l' ? 'R' : 'L';
         const wing = parts[`${side}_wing`];
         flapRotation.setFromAxisAngle(Z, sign * flap);
         // The original pose has wings folded backward over the abdomen.
         foldRotation.setFromAxisAngle(Y, -sign * (1 - fold) * 1.05);
         wing.object.quaternion.copy(flapRotation).multiply(foldRotation).multiply(wing.rest);
+        if (W > 0) {
+          const wa = wingAngles(rg['wing' + screenSide]);
+          const rigFlap = Math.sin(flapPhase * Math.PI * 2) * rg['flap' + screenSide] * 0.75 * motion;
+          poseTarget.setFromAxisAngle(Z, sign * (wa.lift + rigFlap));
+          poseRotation.setFromAxisAngle(Y, -sign * (1.05 - wa.sweep));
+          poseTarget.multiply(poseRotation).multiply(wing.rest);
+          wing.object.quaternion.slerp(poseTarget, W);
+        }
+        poseRotation.setFromAxisAngle(Z, sign * extraFlap);
+        wing.object.quaternion.premultiply(poseRotation);
         for (const [index, leg] of ['f', 'm', 'h'].entries()) {
           const upper = parts[`${side}${leg}_upper`];
           const lower = parts[`${side}${leg}_lower`];
@@ -61,11 +78,30 @@ export async function loadFlyModel() {
           upper.object.quaternion.copy(upper.rest).multiply(legRotation);
           legRotation.setFromAxisAngle(X, (leg === 'h' ? 1 : -1) * tuck * 0.8);
           lower.object.quaternion.copy(lower.rest).multiply(legRotation);
+          if (W > 0) {
+            const raise = leg === 'f' ? rg['leg' + screenSide] : 0;
+            const wiggle = Math.sin(t * (3 + 9 * rg.legWiggle) + index * 2 + sign) * rg.legWiggle * 0.3 * motion;
+            poseRotation.setFromAxisAngle(Z, sign * (raise * 1.65 + wiggle + rg.curl * 0.2));
+            poseTarget.copy(upper.rest).multiply(poseRotation);
+            upper.object.quaternion.slerp(poseTarget, W);
+            poseRotation.setFromAxisAngle(Z, sign * (raise * 0.85 + rg.curl * 0.7));
+            poseTarget.copy(lower.rest).multiply(poseRotation);
+            poseRotation.setFromAxisAngle(Y, leg === 'f' ? sign * rg['swing' + screenSide] * 0.65 : 0);
+            poseTarget.multiply(poseRotation);
+            lower.object.quaternion.slerp(poseTarget, W);
+          }
         }
       }
       const head = parts.head;
       flapRotation.setFromAxisAngle(Y, Math.sin(t * 2) * (state === 'listening' ? 0.06 : 0.015) * motion);
       head.object.quaternion.copy(head.rest).multiply(flapRotation);
+      if (W > 0) {
+        poseRotation.setFromAxisAngle(Y, rg.lookX * 0.6);
+        poseTarget.copy(head.rest).multiply(poseRotation);
+        poseRotation.setFromAxisAngle(X, rg.lookY * 0.4);
+        poseTarget.multiply(poseRotation);
+        head.object.quaternion.slerp(poseTarget, W);
+      }
     },
   };
 }

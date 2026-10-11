@@ -292,6 +292,85 @@ export function createFlyAudio(opts = {}) {
     }
   }
 
+  // Short low "boom" for meme flashes. Level >= 1 only; honours mute, ducking and a hidden tab.
+  function playBoom() {
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const o = osc('sine', 150); const gn = gainNode(0.0001);
+    o.frequency.setValueAtTime(150, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + 0.4);
+    envelope(gn.gain, t0, 0.5, 0.01, 0.06, 0.34);
+    link(o, gn, master.bus); o.start(t0);
+    const nz = noiseSource(false); const lp = bp(300, 0.7, 'lowpass'); const ng = gainNode(0.0001);
+    envelope(ng.gain, t0, 0.25, 0.005, 0.02, 0.12);
+    link(nz, lp, ng, master.bus); nz.start(t0);
+    finish([o, nz], t0 + 0.5);
+    return true;
+  }
+
+  // Meme sound effects (all synthesized, nothing is downloaded). Level >= 1 only; honour mute, ducking and a hidden tab.
+  // name: boom (vine boom) | airhorn | bruh | violin | scratch | ding | buzzer | wow. Unknown names and "none" make no sound.
+  const MEME_SOUNDS = ['boom', 'airhorn', 'bruh', 'violin', 'scratch', 'ding', 'buzzer', 'wow'];
+  function playMeme(name) {
+    if (!MEME_SOUNDS.includes(name)) return false;
+    if (name === 'boom') return playBoom();
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const tone = (type, f0, f1, dur, peak, att = 0.01, filt = null) => {
+      const o = osc(type, f0); const gn = gainNode(0.0001);
+      o.frequency.setValueAtTime(f0, t0); if (f1 !== f0) o.frequency.exponentialRampToValueAtTime(f1, t0 + dur);
+      envelope(gn.gain, t0, peak, att, Math.max(0, dur * 0.6 - att), dur * 0.4);
+      if (filt) link(o, filt, gn, master.bus); else link(o, gn, master.bus);
+      o.start(t0); return o;
+    };
+    let srcs = []; let dur = 0.6;
+    switch (name) {
+      case 'airhorn': // three detuned sawtooth voices with a pitch drop at the end
+        dur = 0.7; srcs = [1, 1.012, 0.988].map((r) => { const o = tone('sawtooth', 520 * r, 440 * r, dur, 0.1, 0.02, bp(3200, 0.6, 'lowpass')); o.frequency.setValueAtTime(520 * r, t0 + 0.4); o.frequency.exponentialRampToValueAtTime(410 * r, t0 + dur); return o; }); break;
+      case 'bruh': dur = 0.5; srcs = [tone('triangle', 190, 90, dur, 0.4, 0.02, bp(700, 0.7, 'lowpass')), tone('square', 95, 60, dur, 0.08, 0.02, bp(400, 0.7, 'lowpass'))]; break;
+      case 'violin': { // sad plucked notes: E4 then Eb4, quick decay, a little vibrato
+        dur = 1.0; const o = osc('sawtooth', 330); const gn = gainNode(0.0001); const f = bp(1800, 1.2); const lfo = osc('sine', 6); const lg = gainNode(5);
+        link(lfo, lg, o.frequency);
+        o.frequency.setValueAtTime(330, t0); o.frequency.setValueAtTime(311, t0 + 0.45);
+        for (const [dt, pk] of [[0, 0.22], [0.45, 0.2]]) { gn.gain.setValueAtTime(0.0001, t0 + dt); gn.gain.linearRampToValueAtTime(pk, t0 + dt + 0.02); gn.gain.exponentialRampToValueAtTime(0.0001, t0 + dt + 0.5); }
+        link(o, f, gn, master.bus); o.start(t0); lfo.start(t0); srcs = [o, lfo]; break;
+      }
+      case 'scratch': { // filtered noise swept up and back, like a record being dragged
+        dur = 0.45; const nz = noiseSource(); const f = bp(600, 4); const gn = gainNode(0.0001);
+        f.frequency.setValueAtTime(600, t0); f.frequency.exponentialRampToValueAtTime(3200, t0 + 0.18); f.frequency.exponentialRampToValueAtTime(500, t0 + dur);
+        envelope(gn.gain, t0, 0.35, 0.02, 0.28, 0.15); link(nz, f, gn, master.bus); nz.start(t0); srcs = [nz]; break;
+      }
+      case 'ding': dur = 0.9; srcs = [tone('sine', 1318, 1318, dur, 0.25, 0.005), tone('sine', 2637, 2637, dur * 0.6, 0.08, 0.005)]; break;
+      case 'buzzer': dur = 0.5; srcs = [tone('square', 120, 118, dur, 0.16, 0.01, bp(1500, 0.5, 'lowpass')), tone('square', 126, 124, dur, 0.12, 0.01, bp(1500, 0.5, 'lowpass'))]; break;
+      case 'wow': { dur = 0.6; const o = tone('sine', 260, 1100, dur, 0.28, 0.03); const lfo = osc('sine', 9); const lg = gainNode(18); link(lfo, lg, o.frequency); lfo.start(t0); srcs = [o, lfo]; break; }
+      default: return false;
+    }
+    finish(srcs, t0 + dur + 0.05);
+    return true;
+  }
+
+  // Silly "boing" for a Copy me hop and a rubber-duck "squeak" for a raised leg. Level >= 1 only; honour mute, ducking and a hidden tab.
+  function playBoing() {
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const o = osc('triangle', 220); const gn = gainNode(0.0001);
+    o.frequency.setValueAtTime(180, t0); o.frequency.exponentialRampToValueAtTime(620, t0 + 0.09); o.frequency.exponentialRampToValueAtTime(260, t0 + 0.38);
+    const lfo = osc('sine', 22); const lg = gainNode(40); link(lfo, lg, o.frequency); lfo.start(t0);
+    envelope(gn.gain, t0, 0.28, 0.01, 0.08, 0.28);
+    link(o, gn, master.bus); o.start(t0);
+    finish([o, lfo], t0 + 0.45);
+    return true;
+  }
+  function playSqueak() {
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const o = osc('square', 900); const gn = gainNode(0.0001); const f = bp(2400, 2.5);
+    o.frequency.setValueAtTime(900, t0); o.frequency.exponentialRampToValueAtTime(2100, t0 + 0.07); o.frequency.exponentialRampToValueAtTime(1500, t0 + 0.14);
+    envelope(gn.gain, t0, 0.14, 0.005, 0.04, 0.1);
+    link(o, f, gn, master.bus); o.start(t0);
+    finish([o], t0 + 0.2);
+    return true;
+  }
+
   // ---- fly voice ----
   function shaperCurve() {
     const n = 256, c = new Float32Array(n), k = 12;
@@ -479,6 +558,11 @@ export function createFlyAudio(opts = {}) {
     async playResultVoice(data, o) { const b = await prepareVoice(data); return playVoice(b, o); },
     speakFallback,
     playJingle,
+    playBoom,
+    playMeme,
+    MEME_SOUNDS,
+    playBoing,
+    playSqueak,
     stopVoice,
     stopAll,
     dispose,

@@ -2,6 +2,7 @@
 import * as THREE from 'three';
 import { loadFlyModel, disposeModel, FLY_SCALE } from '/static/fly-model.js';
 import { createLandingFlower } from '/static/fly-meadow.js';
+import { RIG_KEYS, IDLE_RIG, clampRig, smoothRig, lerp, wingAngles } from '/static/fly-mimic.js';
 
 const FONT = '"Noto Sans Thai", "Sarabun", system-ui, sans-serif';
 const PADS = {
@@ -86,7 +87,9 @@ export function createScene(container, { reducedMotion = false } = {}) {
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   } catch (err) {
-    return { ok: false, error: err, setState() {}, setCandidates() {}, dispose() {} };
+    return { ok: false, error: err, setState() {}, setCandidates() {}, dispose() {},
+      setPose() {}, setPoseWeight() {}, setOffsets() {}, setFrameHook() {},
+      getPose() { return { ...IDLE_RIG, weight: 0 }; }, settled: false };
   }
   const motion = reducedMotion ? 0.35 : 1;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -260,6 +263,19 @@ export function createScene(container, { reducedMotion = false } = {}) {
   const tmp = new THREE.Vector3();
   const tmp2 = new THREE.Vector3();
 
+  const rigTarget = { ...IDLE_RIG };
+  let rigCur = { ...IDLE_RIG }, poseW = 0, poseWT = 0;
+  const offs = { dx: 0, dy: 0, yaw: 0, spin: 0, flap: 0, camX: 0 };
+  let frameHook = null, glowOp = 0.12;
+  function setPose(partial) {
+    const next = clampRig({ ...rigTarget, ...partial });
+    for (const key of RIG_KEYS) rigTarget[key] = next[key];
+  }
+  function setPoseWeight(w) { poseWT = Math.min(1, Math.max(0, Number(w) || 0)); }
+  function setOffsets(o) { for (const key of Object.keys(offs)) offs[key] = Number.isFinite(o?.[key]) ? o[key] : 0; }
+  function setFrameHook(fn) { frameHook = typeof fn === 'function' ? fn : null; }
+  function getPose() { return { ...rigCur, weight: poseW }; }
+
   function setState(next, opts = {}) {
     if (next === 'deciding') {
       const padId = PADS[opts.pad] ? opts.pad : 'none';
@@ -317,6 +333,12 @@ export function createScene(container, { reducedMotion = false } = {}) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     stateT += dt;
+    if (frameHook) { try { frameHook({ dt, t, state, landed }); } catch (_) { /* decoration only */ } }
+    rigCur = smoothRig(rigCur, rigTarget, dt, 16);
+    poseW += (poseWT - poseW) * Math.min(1, dt * (poseWT > poseW ? 6 : 4));
+    if (Math.abs(poseWT - poseW) < 1e-3) poseW = poseWT;
+    // Pause pose overrides during question/decision motion, even if a caller supplies a weight.
+    const W = (state === 'idle' || (state === 'deciding' && landed) || (state === 'inconclusive' && spin < 0.05)) ? poseW : 0;
 
     // Target pose per state
     let freq = WING_FREQ[state] || 9;
@@ -385,10 +407,35 @@ export function createScene(container, { reducedMotion = false } = {}) {
     wingL.rotation.z = flap + 0.15 * (1 - fold);
     wingR.rotation.z = -flap - 0.15 * (1 - fold);
     const glowBase = state === 'listening' ? 0.22 : 0.08;
-    glow.material.opacity += (glowBase + Math.sin(t * 2) * 0.02 - glow.material.opacity) * Math.min(1, dt * 4);
+    glowOp += (glowBase + Math.sin(t * 2) * 0.02 - glowOp) * Math.min(1, dt * 4);
+    glow.material.opacity = glowOp + rigCur.glow * W * 0.3;
+    glow.material.color.setHex(rigCur.glow * W > 0.01 ? 0xd2ac5d : 0xb8ddce);
     // Subtle leg shuffle when landed
     for (let i = 0; i < legs.length; i++) legs[i].rotation.x = landed ? 0 : Math.sin(t * 3 + i) * 0.05 * motion;
-    if (realisticFly) realisticFly.update({ flap, fold, t, landed, motion, state });
+    const rg = rigCur, mot = reducedMotion ? 0.6 : 1;
+    fly.rotation.z = lerp(fly.rotation.z, rg.roll * 0.8 * mot, W);
+    fly.rotation.x += W * rg.pitch * 0.5 * mot;
+    const sq = rg.squash * W * mot;
+    fly.scale.set(FLY_SCALE * (1 + 0.22 * sq), FLY_SCALE * (1 - 0.38 * sq), FLY_SCALE * (1 + 0.22 * sq));
+    fly.position.y += rg.hop * 0.6 * W * mot;
+    const extraFlap = offs.flap > 0.05 ? Math.sin(t * 46 * Math.PI) * 0.85 * offs.flap * mot : 0;
+    if (realisticFly) realisticFly.update({ flap, fold, t, landed, motion, state, rig: rg, weight: W, flapPhase, extraFlap });
+    else {
+      // Retain camera motion while the textured model is loading or unavailable.
+      for (const [pivot, side, key] of [[wingL, 1, 'L'], [wingR, -1, 'R']]) {
+        const wa = wingAngles(rg['wing' + key]);
+        pivot.rotation.y = side * lerp(sweep, wa.sweep, W);
+        pivot.rotation.z = lerp(pivot.rotation.z, side * (wa.lift + Math.sin(flapPhase * Math.PI * 2) * rg['flap' + key] * 0.75 * motion), W) + side * extraFlap;
+      }
+      for (const [index, leg] of legs.entries()) {
+        const side = index < 3 ? -1 : 1, key = side < 0 ? 'L' : 'R';
+        leg.rotation.z = side * (index % 3 === 0 ? rg['leg' + key] * 1.65 : rg.curl * 0.4) * W;
+      }
+      head.rotation.y = rg.lookX * 0.6 * W;
+      head.rotation.x = rg.lookY * 0.4 * W;
+    }
+    fly.position.x += offs.dx; fly.position.y += offs.dy;
+    fly.rotation.y += offs.yaw + offs.spin;
 
     // Pulse ring
     if (state === 'listening') {
@@ -414,7 +461,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     if (lastWinner === null) { refreshWinnerLabels(); lastWinner = true; }
 
     // Camera drift
-    camera.position.set(camBase.x + Math.sin(t * 0.25) * 0.7 * motion, camBase.y + Math.sin(t * 0.19) * 0.3 * motion, camBase.z);
+    camera.position.set(camBase.x - offs.camX + Math.sin(t * 0.25) * 0.7 * motion, camBase.y + Math.sin(t * 0.19) * 0.3 * motion, camBase.z);
     camera.lookAt(0, -0.2, 0);
 
     renderer.render(scene, camera);
@@ -440,6 +487,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     renderer.domElement.remove();
   }
 
-  return { ok: true, setState, setCandidates, dispose, modelReady,
+  return { ok: true, setState, setCandidates, dispose, modelReady, setPose, setPoseWeight, setOffsets, setFrameHook, getPose,
+    get settled() { return state === 'idle' || (state === 'deciding' && landed) || (state === 'inconclusive' && spin < 0.05); },
     get modelStatus() { return modelStatus; }, get state() { return state; }, get landed() { return landed; } };
 }

@@ -1,0 +1,200 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Meme PNG generator</title>
+<!-- Renders ONE meme from captions.js to a canvas. Open with #<id> (e.g. generator.html#siuuuu) to preview it, or run
+     `python3 scripts/make_meme_pngs.py` to render every meme to web/memes/png/*.png through headless Chromium.
+     Fonts: Liberation Sans (Latin, squashed to look like Impact), Noto Sans Thai (Thai), Noto Color Emoji (belly-man only). -->
+<style>html,body{margin:0;padding:0;overflow:hidden;background:transparent}canvas{display:block}</style>
+<canvas id="c"></canvas>
+<script src="captions.js"></script>
+<script>
+const SQ = 0.84;                                  // horizontal squash: bold sans -> Impact-ish condensed look
+const OFFWHITE = '#f6f1e6', INK = '#0a0a10';
+const FONT = '"Liberation Sans","DejaVu Sans","Noto Sans Thai",sans-serif';
+const EMOJI_FONT = '"Noto Color Emoji",sans-serif';
+const isThai = (s) => /[฀-๿]/.test(s);
+function rngOf(seed) { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+const hash = (s) => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+
+// ---- text: fit into a box, wrap on spaces, outlined like a meme ----
+function layoutText(ctx, text, maxW, maxH, maxSize, weight = 900) {
+  const thai = isThai(text), lh = thai ? 1.35 : 1.04;
+  for (let size = maxSize; size >= 14; size -= 2) {
+    ctx.font = `${weight} ${size}px ${FONT}`;
+    const words = text.split(/\s+/).filter(Boolean), lines = [];
+    let cur = '';
+    for (const w of words) {
+      const t = cur ? cur + ' ' + w : w;
+      if (ctx.measureText(t).width * SQ <= maxW || !cur) cur = t; else { lines.push(cur); cur = w; }
+    }
+    if (cur) lines.push(cur);
+    const widest = Math.max(...lines.map((l) => ctx.measureText(l).width * SQ));
+    if (widest <= maxW && lines.length * size * lh <= maxH) return { size, lines, lh };
+  }
+  return { size: 14, lines: [text], lh };
+}
+function drawText(ctx, text, cx, cy, maxW, maxH, o = {}) {
+  const L = layoutText(ctx, text, maxW, maxH, o.maxSize || 200, o.weight || 900);
+  const { size, lines, lh } = L;
+  ctx.save();
+  ctx.translate(cx, cy); if (o.rot) ctx.rotate(o.rot * Math.PI / 180); ctx.scale(SQ, 1);
+  ctx.font = `${o.weight || 900} ${size}px ${FONT}`;
+  ctx.textAlign = o.align || 'center'; ctx.textBaseline = 'middle';
+  ctx.lineJoin = 'round'; ctx.miterLimit = 2;
+  const top = -((lines.length - 1) * size * lh) / 2;
+  lines.forEach((l, i) => {
+    const y = top + i * size * lh + (isThai(l) ? size * 0.04 : 0);
+    if (o.shadow !== false) { ctx.fillStyle = o.shadowColor || 'rgba(0,0,0,.55)'; ctx.fillText(l, size * 0.04, y + size * 0.08); }
+    if (o.outer) { ctx.strokeStyle = o.outer; ctx.lineWidth = size * (o.stroke || 0.16) * 1.9; ctx.strokeText(l, 0, y); }
+    if (o.stroke !== 0) { ctx.strokeStyle = o.strokeColor || INK; ctx.lineWidth = size * (o.stroke || 0.16); ctx.strokeText(l, 0, y); }
+    ctx.fillStyle = o.fill || OFFWHITE; ctx.fillText(l, 0, y);
+  });
+  ctx.restore();
+  return L;
+}
+
+// ---- backgrounds ----
+function background(ctx, w, h, theme, rnd, pattern) {
+  const [c1, c2] = (window.MEME_THEMES[theme] || window.MEME_THEMES.grape);
+  const g = ctx.createLinearGradient(0, 0, w * 0.7, h); g.addColorStop(0, c1); g.addColorStop(1, c2);
+  ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+  ctx.save();
+  const cx = w * (0.35 + rnd() * 0.3), cy = h * (0.35 + rnd() * 0.3);
+  if (pattern === 'rays') {
+    ctx.fillStyle = 'rgba(255,255,255,.07)'; const n = 18, a0 = rnd() * 6;
+    for (let i = 0; i < n; i++) { const a = a0 + (i / n) * Math.PI * 2, b = a + Math.PI / n; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(cx + Math.cos(a) * w * 2, cy + Math.sin(a) * w * 2); ctx.lineTo(cx + Math.cos(b) * w * 2, cy + Math.sin(b) * w * 2); ctx.fill(); }
+  } else if (pattern === 'dots') {
+    ctx.fillStyle = 'rgba(255,255,255,.08)'; const s = 26; for (let y = 0; y < h + s; y += s) for (let x = ((y / s) % 2) * s / 2; x < w + s; x += s) { ctx.beginPath(); ctx.arc(x, y, 5 + 4 * (y / h), 0, 7); ctx.fill(); }
+  } else if (pattern === 'stripes') {
+    ctx.translate(w / 2, h / 2); ctx.rotate(-0.5); ctx.fillStyle = 'rgba(255,255,255,.06)'; for (let x = -w; x < w; x += 56) ctx.fillRect(x, -h, 28, h * 2);
+  } else if (pattern === 'checker') {
+    ctx.fillStyle = 'rgba(255,255,255,.05)'; const s = 48; for (let y = 0; y < h; y += s) for (let x = 0; x < w; x += s) if (((x + y) / s) % 2 === 0) ctx.fillRect(x, y, s, s);
+  } else if (pattern === 'grid') {
+    ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.lineWidth = 2; for (let x = 0; x < w; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); } for (let y = 0; y < h; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+  }
+  ctx.restore();
+  // vignette keeps the corners dark (moderate luminance, no bright fields)
+  const v = ctx.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.3, w / 2, h / 2, Math.max(w, h) * 0.75); v.addColorStop(0, 'rgba(0,0,0,0)'); v.addColorStop(1, 'rgba(0,0,0,.45)');
+  ctx.fillStyle = v; ctx.fillRect(0, 0, w, h);
+}
+const PATTERNS = ['rays', 'dots', 'stripes', 'checker', 'grid'];
+
+// ---- the mascot: a plain cartoon fly drawn from ellipses ----
+function drawFly(ctx, x, y, s, rot = 0, alpha = 1) {
+  ctx.save(); ctx.translate(x, y); ctx.rotate(rot * Math.PI / 180); ctx.scale(s, s); ctx.globalAlpha = alpha;
+  const el = (cx, cy, rx, ry, fill, r = 0) => { ctx.beginPath(); ctx.ellipse(cx, cy, rx, ry, r, 0, 7); ctx.fillStyle = fill; ctx.fill(); };
+  el(-34, -30, 40, 20, 'rgba(210,235,255,.55)', -0.7); el(34, -30, 40, 20, 'rgba(210,235,255,.55)', 0.7);
+  ctx.strokeStyle = INK; ctx.lineWidth = 3; ctx.stroke();
+  el(0, 18, 24, 34, '#1d1d28'); el(0, -14, 22, 20, '#2b2b3a');
+  el(-12, -22, 12, 14, '#d4202a'); el(12, -22, 12, 14, '#d4202a');
+  el(-12, -24, 4, 5, '#fff'); el(12, -24, 4, 5, '#fff');
+  ctx.lineWidth = 4; ctx.strokeStyle = INK; ctx.beginPath(); ctx.arc(0, -6, 12, 0.2 * Math.PI, 0.8 * Math.PI); ctx.stroke();
+  ctx.restore();
+}
+function roundRect(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.roundRect(x, y, w, h, r); }
+
+// ---- layouts ----
+const LAYOUTS = {
+  center(ctx, m, w, h, rnd) {
+    background(ctx, w, h, m.theme, rnd, PATTERNS[Math.floor(rnd() * 3)]);
+    drawFly(ctx, w * 0.86, h * 0.14, 0.5, 18, 0.8);
+    drawText(ctx, m.text, w / 2, h / 2, w * 0.88, h * 0.7, { maxSize: 260, outer: m.fry > 1 ? '#ffd60a' : undefined, rot: m.tilt ?? (rnd() * 6 - 3) });
+  },
+  topbottom(ctx, m, w, h, rnd) {
+    background(ctx, w, h, m.theme, rnd, 'rays');
+    drawFly(ctx, w / 2, h / 2, Math.min(w, h) / 150, rnd() * 20 - 10, 0.9);
+    drawText(ctx, m.text, w / 2, h * 0.17, w * 0.92, h * 0.28, { maxSize: 150 });
+    if (m.text2) drawText(ctx, m.text2, w / 2, h * 0.84, w * 0.92, h * 0.28, { maxSize: 150 });
+  },
+  sticker(ctx, m, w, h, rnd) {
+    background(ctx, w, h, 'night', rnd, 'dots');
+    const [c1, c2] = window.MEME_THEMES[m.theme];
+    ctx.save(); ctx.translate(w / 2, h / 2); ctx.rotate((m.tilt || 0) * Math.PI / 180);
+    const sw = w * 0.82, sh = h * 0.66;
+    ctx.shadowColor = 'rgba(0,0,0,.6)'; ctx.shadowBlur = 24; ctx.shadowOffsetY = 12;
+    roundRect(ctx, -sw / 2 - 16, -sh / 2 - 16, sw + 32, sh + 32, 56); ctx.fillStyle = '#e9e4d8'; ctx.fill();
+    ctx.shadowColor = 'transparent';
+    roundRect(ctx, -sw / 2, -sh / 2, sw, sh, 42); const g = ctx.createLinearGradient(0, -sh / 2, 0, sh / 2); g.addColorStop(0, c1); g.addColorStop(1, c2); ctx.fillStyle = g; ctx.fill();
+    ctx.restore();
+    drawFly(ctx, w * 0.2, h * 0.2, 0.6, -20);
+    drawText(ctx, m.text, w / 2, h * (m.text2 ? 0.45 : 0.5), sw * 0.9, sh * (m.text2 ? 0.5 : 0.75), { maxSize: 170, rot: m.tilt || 0 });
+    if (m.text2) drawText(ctx, m.text2, w / 2, h * 0.65, sw * 0.8, sh * 0.25, { maxSize: 80, rot: m.tilt || 0 });
+  },
+  wanted(ctx, m, w, h, rnd) {
+    const g = ctx.createLinearGradient(0, 0, w, h); g.addColorStop(0, '#5b3b1d'); g.addColorStop(1, '#3a2312'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h);
+    ctx.fillStyle = 'rgba(0,0,0,.18)'; for (let i = 0; i < 400; i++) ctx.fillRect(rnd() * w, rnd() * h, 2 + rnd() * 4, 1 + rnd() * 2); // paper grain
+    ctx.strokeStyle = '#e6d3a3'; ctx.lineWidth = 10; ctx.strokeRect(24, 24, w - 48, h - 48); ctx.lineWidth = 3; ctx.strokeRect(42, 42, w - 84, h - 84);
+    drawText(ctx, m.head, w / 2, h * 0.14, w * 0.8, h * 0.16, { maxSize: 130, fill: '#f0dfb0', strokeColor: '#1b0f05' });
+    const cy = h * 0.42, r = Math.min(w, h) * 0.24;
+    ctx.fillStyle = '#2a1a0c'; ctx.fillRect(w / 2 - r * 1.25, cy - r * 1.1, r * 2.5, r * 2.2); ctx.strokeStyle = '#e6d3a3'; ctx.lineWidth = 5; ctx.strokeRect(w / 2 - r * 1.25, cy - r * 1.1, r * 2.5, r * 2.2);
+    drawFly(ctx, w / 2, cy, r / 55, 0);
+    drawText(ctx, m.text, w / 2, h * 0.73, w * 0.8, h * 0.17, { maxSize: 110, fill: '#f0dfb0', strokeColor: '#1b0f05' });
+    drawText(ctx, m.text2, w / 2, h * 0.88, w * 0.7, h * 0.08, { maxSize: 44, fill: '#d9c58f', strokeColor: '#1b0f05', stroke: 0.1 });
+  },
+  notif(ctx, m, w, h, rnd) {
+    background(ctx, w, h, m.theme, rnd, 'dots');
+    // soft blurred blobs: a phone wallpaper
+    for (let i = 0; i < 4; i++) { const x = rnd() * w, y = rnd() * h, g = ctx.createRadialGradient(x, y, 0, x, y, w * 0.4); g.addColorStop(0, 'rgba(255,255,255,.10)'); g.addColorStop(1, 'rgba(255,255,255,0)'); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); }
+    const bw = w * 0.92, bh = h * 0.62, bx = (w - bw) / 2, by = h * 0.19;
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.5)'; ctx.shadowBlur = 30; ctx.shadowOffsetY = 10;
+    roundRect(ctx, bx, by, bw, bh, 40); ctx.fillStyle = 'rgba(28,28,34,.92)'; ctx.fill(); ctx.restore();
+    roundRect(ctx, bx + 26, by + 26, 64, 64, 16); ctx.fillStyle = '#d4202a'; ctx.fill(); drawFly(ctx, bx + 58, by + 60, 0.4, 0);
+    drawText(ctx, m.head || 'THE FLY', bx + 108, by + 44, bw * 0.55, 34, { align: 'left', maxSize: 30, weight: 700, shadow: false, stroke: 0, fill: '#c9c9d4' });
+    ctx.fillStyle = '#9a9aa8'; ctx.font = `600 22px ${FONT}`; ctx.textAlign = 'right'; ctx.fillText(isThai(m.text) ? 'ตอนนี้' : 'now', bx + bw - 28, by + 46);
+    drawText(ctx, m.text, bx + bw / 2, by + bh * 0.66, bw * 0.9, bh * 0.58, { maxSize: 170, stroke: 0.06, shadow: false });
+  },
+  subtitle(ctx, m, w, h, rnd) {
+    background(ctx, w, h, m.theme, rnd, 'grid');
+    drawFly(ctx, w * 0.5, h * 0.36, Math.min(w, h) / 200, rnd() * 24 - 12, 0.75);
+    if (m.text2) drawText(ctx, m.text2, w / 2, h * 0.1, w * 0.9, h * 0.12, { maxSize: 52, weight: 700, fill: '#ffe066', stroke: 0.1 });
+    const bh = h * 0.27, by = h * 0.64;
+    ctx.fillStyle = 'rgba(0,0,0,.78)'; ctx.fillRect(w * 0.05, by, w * 0.9, bh);
+    drawText(ctx, m.text, w / 2, by + bh / 2, w * 0.84, bh * 0.82, { maxSize: 130, fill: '#ffe94a', stroke: 0, shadow: false });
+  },
+  tier(ctx, m, w, h, rnd) {
+    background(ctx, w, h, 'night', rnd, 'checker');
+    const rows = [['S', '#e0343a'], ['A', '#e08a1e'], ['B', '#d6c21f'], ['C', '#3aa84a']];
+    const win = Math.max(0, rows.findIndex((r) => r[0] === (m.head || 'S')[0]));
+    const big = h * 0.4, small = (h * 0.9 - big - 18) / 3; let y = h * 0.05;
+    rows.forEach(([l, col], i) => {
+      const rh = i === win ? big : small;
+      ctx.fillStyle = i === win ? '#2b2b3a' : '#1b1b24'; ctx.fillRect(w * 0.05, y, w * 0.9, rh);
+      ctx.fillStyle = col; ctx.fillRect(w * 0.05, y, i === win ? big * 0.6 : rh, rh);
+      const lw = i === win ? big * 0.6 : rh;
+      drawText(ctx, l, w * 0.05 + lw / 2, y + rh / 2, lw * 0.8, rh * 0.8, { maxSize: 200, stroke: 0, shadow: false, fill: '#14141a' });
+      if (i === win) drawText(ctx, m.text, w * 0.05 + lw + (w * 0.9 - lw) / 2, y + rh / 2, (w * 0.9 - lw) * 0.92, rh * 0.86, { maxSize: 140 });
+      y += rh + 6;
+    });
+  },
+  emoji(ctx, m, w, h) {
+    ctx.clearRect(0, 0, w, h);
+    ctx.font = `400 ${Math.round(w * 0.78)}px ${EMOJI_FONT}`; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(m.text, w / 2, h * 0.52);
+  },
+};
+
+// ---- deep-fry: contrast + saturation + noise + a harsh JPEG round trip ----
+async function fry(canvas, level, rnd) {
+  const w = canvas.width, h = canvas.height, ctx = canvas.getContext('2d');
+  const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h; const t = tmp.getContext('2d');
+  t.filter = `contrast(${1 + 0.25 * level}) saturate(${1 + 0.45 * level}) brightness(${1 - 0.04 * level})`; t.drawImage(canvas, 0, 0);
+  const id = t.getImageData(0, 0, w, h), d = id.data, amp = 10 + 10 * level;
+  for (let i = 0; i < d.length; i += 4) { const n = (rnd() - 0.5) * amp; d[i] += n; d[i + 1] += n; d[i + 2] += n; }
+  t.putImageData(id, 0, 0);
+  const url = tmp.toDataURL('image/jpeg', Math.max(0.12, 0.6 - 0.15 * level));
+  const img = new Image(); await new Promise((res, rej) => { img.onload = res; img.onerror = rej; img.src = url; });
+  ctx.clearRect(0, 0, w, h); ctx.drawImage(img, 0, 0);
+}
+
+async function renderMeme(m) {
+  const c = document.getElementById('c'); const [w, h] = m.size; c.width = w; c.height = h;
+  const ctx = c.getContext('2d'); const rnd = rngOf(hash(m.id));
+  LAYOUTS[m.layout](ctx, m, w, h, rnd);
+  if (m.fry) await fry(c, m.fry, rnd);
+  return m;
+}
+window.renderMeme = renderMeme;
+const wanted = decodeURIComponent(location.hash.slice(1)) || window.MEMES[0].id;
+const meme = window.MEMES.find((x) => x.id === wanted);
+if (meme) { document.title = 'rendering'; renderMeme(meme).then(() => { document.title = 'done'; }); }
+</script>
