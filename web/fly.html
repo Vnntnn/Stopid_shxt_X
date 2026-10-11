@@ -12,10 +12,6 @@
 </head>
 <body>
 <main class="frame" id="frame">
-  <header class="garden-title">
-    <img src="/static/ceremonial-ornament.svg" width="80" height="47" alt="">
-    <div><p>FLY ASK · หึ่ง ๆ</p><h1>แมลงวันช่วยคิด</h1><span>ถามมา เดี๋ยวบินไปเลือกให้</span></div>
-  </header>
   <div class="stage" id="stage">
     <div class="fallback" id="webgl-fallback" hidden role="status">
       แสดงแมลงวัน 3D ไม่ได้ในเบราว์เซอร์นี้ แต่ยังถามแมลงวันผ่านช่องข้อความได้
@@ -36,20 +32,8 @@
   <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
   <a class="model-credit" href="https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd" target="_blank" rel="noopener noreferrer">Housefly · Schmoldt5000 / schmoldt.art · CC BY 4.0</a>
 
-  <section class="panel you" aria-labelledby="you-title">
-    <h2 id="you-title">ถามแมลงวัน</h2>
-    <p class="hint">บอกสองตัวเลือกกับสิ่งที่สำคัญ แล้วให้แมลงวันช่วยเลือก</p>
-    <div class="mode-row">
-      <div class="seg" role="tablist" aria-label="Input mode">
-        <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">พิมพ์ข้อความ</button>
-        <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">ใช้เสียง</button>
-      </div>
-      <button type="button" class="cam-toggle" id="cam-toggle" aria-pressed="false" title="เปิดกล้องให้แมลงวันเห็นท่าทางและแสดงมีม">
-        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z"/></svg>
-        <span id="cam-toggle-label">เปิดกล้อง</span>
-      </button>
-    </div>
-    <p class="cam-status" id="cam-status" role="status" aria-live="polite" hidden></p>
+  <section class="panel you composer" aria-labelledby="you-title">
+    <div class="composer-head"><span class="composer-dot" aria-hidden="true"></span><h2 id="you-title">คุยกับแมลงวัน</h2><span class="composer-channel">หึ่ง ๆ</span></div>
     <div class="cam-box" id="cam-box" hidden role="group" aria-label="ภาพจากกล้อง">
       <div class="cam-view" id="cam-view">
         <video id="cam-video" playsinline muted></video>
@@ -63,75 +47,21 @@
       <div class="cam-note">ประมวลผลในเบราว์เซอร์ ไม่อัปโหลดหรือบันทึกภาพ</div>
     </div>
 
-    <div id="pane-text" role="tabpanel" aria-labelledby="tab-text">
-      <label class="sr-only" for="q">Your question</label>
-      <textarea id="q" rows="3" placeholder="ระหว่างพรรค A กับพรรค B ถ้าเน้นแก้ปัญหาค่าครองชีพ ควรเลือกพรรคไหน?"></textarea>
-      <div class="row">
-        <label class="check"><input type="checkbox" id="replay"> Replay cached</label>
-        <button type="button" class="primary" id="send">ส่งคำถาม</button>
-      </div>
+    <label class="sr-only" for="q">ข้อความถึงแมลงวัน</label>
+    <textarea id="q" rows="2" placeholder="ระหว่างพรรค A กับพรรค B ถ้าเน้นแก้ปัญหาค่าครองชีพ ควรเลือกพรรคไหน?"></textarea>
+    <div class="composer-toolbar" role="group" aria-label="ส่งข้อความ ไมค์ และกล้อง">
+      <button type="button" class="composer-icon mic" id="mic" aria-pressed="false" aria-label="เปิดไมค์" title="พูดกับแมลงวัน"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12z"/></svg></button>
+      <button type="button" class="composer-icon cam-toggle" id="cam-toggle" aria-pressed="false" aria-label="เปิดกล้อง" title="เปิดกล้องให้แมลงวันเห็นคุณ"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z"/></svg><span class="sr-only" id="cam-toggle-label">เปิดกล้อง</span></button>
+      <button type="button" class="composer-icon" id="chat-settings-toggle" aria-label="ตั้งค่าแชตและท่าทาง" title="ตั้งค่า" aria-haspopup="dialog"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="m19.4 13 .1-1-.1-1 2-1.6-2-3.4-2.4 1a8 8 0 0 0-1.7-1L15 3h-4l-.4 3a8 8 0 0 0-1.7 1L6.5 6l-2 3.4 2 1.6-.1 1 .1 1-2 1.6 2 3.4 2.4-1a8 8 0 0 0 1.7 1l.4 3h4l.4-3a8 8 0 0 0 1.7-1l2.4 1 2-3.4zM13 15a3 3 0 1 1 0-6 3 3 0 0 1 0 6z"/></svg></button>
+      <span class="composer-shortcut" aria-hidden="true">Enter เพื่อส่ง</span>
+      <button type="button" class="composer-icon composer-send primary" id="send" aria-label="ส่งข้อความ" title="ส่งข้อความ"><svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" aria-hidden="true"><path d="m3 3 19 9-19 9 3-8 10-1-10-1z"/></svg></button>
     </div>
-
-    <div id="pane-voice" role="tabpanel" aria-labelledby="tab-voice" hidden>
-      <div class="mic-row">
-        <button type="button" class="mic" id="mic" aria-pressed="false" aria-label="Start recording">
-          <svg viewBox="0 0 24 24" width="26" height="26" aria-hidden="true"><path fill="currentColor" d="M12 15a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-2.08A7 7 0 0 0 19 12z"/></svg>
-        </button>
-        <div class="mic-info">
-          <div id="mic-status" aria-live="polite">Click the mic to start, click again to stop.</div>
-          <div class="meter" aria-hidden="true"><span id="meter-bar"></span></div>
-          <div class="timer" id="mic-time" aria-hidden="true">0:00</div>
-        </div>
-      </div>
-      <label class="sr-only" for="transcript">Transcript (editable)</label>
-      <textarea id="transcript" rows="2" placeholder="Transcript appears here. You can edit it." hidden></textarea>
-      <div class="row" id="confirm-row" hidden>
-        <span id="countdown" aria-live="polite"></span>
-        <span>
-          <button type="button" id="cancel-send">Cancel</button>
-          <button type="button" class="primary" id="send-voice">Send now</button>
-        </span>
-      </div>
+    <div class="voice-activity" id="voice-activity" hidden>
+      <span id="mic-status" role="status" aria-live="polite"></span><span class="timer" id="mic-time">0:00</span>
+      <div class="meter" aria-hidden="true"><span id="meter-bar"></span></div>
     </div>
-
-    <div class="mimic" id="mimic" role="group" aria-label="ทำท่าตามฉัน">
-      <label class="check mimic-main"><input type="checkbox" id="mimic-on"> <b>ทำท่าตามฉัน</b> <span class="mimic-sub">ให้แมลงวันขยับตามท่าทางของคุณ</span></label>
-      <span class="mimic-status" id="mimic-status" role="status" aria-live="polite"></span>
-      <div class="mimic-opts" id="mimic-opts" hidden>
-        <label class="check"><input type="checkbox" id="mimic-mirror" checked> กระจกเงา</label>
-        <label class="mimic-smooth" for="mimic-smooth">ความลื่นไหล <input type="range" id="mimic-smooth" min="0" max="100" step="5" value="50"></label>
-        <button type="button" class="mini" id="mimic-recal" title="ยืนนิ่งสักครู่เพื่อวัดท่าทางเริ่มต้นใหม่">ตั้งท่าใหม่</button>
-      </div>
-    </div>
-    <details class="cam-actions" id="cam-actions">
-      <summary>ตั้งค่าท่าทางและมีม</summary>
-      <div class="cam-actions-body">
-        <div class="cam-opt">
-          <label for="cam-sens">ความไว</label>
-          <select id="cam-sens"><option value="low">ต่ำ</option><option value="normal" selected>ปกติ</option><option value="high">สูง</option></select>
-        </div>
-        <label class="check cam-ask"><input type="checkbox" id="cam-ask"> ให้ท่าทางส่งคำถาม (มีค่าใช้จ่าย)</label>
-        <p class="cam-hint" id="cam-ask-hint">ส่งคำถามเมื่อค้างท่า 0.8 วินาที เว้นอย่างน้อย 10 วินาทีต่อคำถาม มีค่าใช้บริการโมเดล</p>
-        <div class="cam-opt">
-          <label for="meme-speed">ความเร็วมีม</label>
-          <select id="meme-speed"><option value="normal" selected>ปกติ</option><option value="fast">เร็ว</option><option value="ultra">เร็วสุด</option></select>
-        </div>
-        <div class="cam-rows" id="cam-rows" role="list"></div>
-        <p class="cam-hint">มีมแสดงเป็นภาพสั้น ๆ ไม่เกิน 2 ครั้งต่อวินาที ปุ่มลองท่าใช้ได้โดยไม่เปิดกล้องและไม่ส่งคำถาม</p>
-        <div class="meme-user-opts">
-          <div class="cam-opt">
-            <button type="button" class="mini" id="meme-add">เพิ่มมีม</button>
-            <button type="button" class="mini" id="meme-export" title="ดาวน์โหลดรายการมีมเป็น JSON">ส่งออกรายการ</button>
-            <input type="file" id="meme-file" accept="image/png,image/jpeg,image/webp" multiple hidden>
-          </div>
-          <p class="cam-hint" id="meme-user-hint">ลากภาพ PNG, JPG หรือ WebP มาวางได้ สูงสุด 40 ไฟล์ ไฟล์ละ 2 MB เก็บเฉพาะในเบราว์เซอร์นี้</p>
-          <label class="check"><input type="checkbox" id="meme-media"> อนุญาตมีม GIF / วิดีโอ / เสียง</label>
-          <p class="meme-warn" id="meme-media-warn" hidden>คลิปเคลื่อนไหวอาจมีแสงกะพริบที่กระตุ้นอาการชักในผู้ไวต่อแสง เปิดเมื่อเหมาะกับผู้ชมเท่านั้น คลิปแสดงไม่เกิน 1.5 วินาที</p>
-          <p class="cam-hint" id="meme-user-status" role="status" aria-live="polite"></p>
-          <div class="meme-thumbs" id="meme-thumbs"></div>
-        </div>
-      </div>
-    </details>
+    <div class="voice-confirm" id="confirm-row" hidden><span id="countdown" role="status" aria-live="polite"></span><button type="button" class="mini" id="cancel-send">พักการส่ง</button></div>
+    <p class="cam-status" id="cam-status" role="status" aria-live="polite" hidden></p>
   </section>
 
   <section class="panel out" id="out" aria-labelledby="out-title">
@@ -196,6 +126,48 @@
   </section>
     <div class="meme-layer" id="meme-layer"><span class="sr-only" id="meme-live" role="status" aria-live="polite"></span></div>
 </main>
+  <dialog class="meme-dialog chat-settings" id="chat-settings" aria-labelledby="chat-settings-title">
+    <div class="chat-settings-head"><h2 id="chat-settings-title">ตั้งค่าการคุย</h2><button type="button" class="mini" id="chat-settings-close" aria-label="ปิดการตั้งค่า">ปิด</button></div>
+    <label class="check"><input type="checkbox" id="replay"> ใช้คำตอบที่เคยถามไว้</label>
+    <div class="mimic" id="mimic" role="group" aria-label="ทำท่าตามฉัน">
+      <label class="check mimic-main"><input type="checkbox" id="mimic-on"> <b>ทำท่าตามฉัน</b> <span class="mimic-sub">ให้แมลงวันขยับตามท่าทางของคุณ</span></label>
+      <span class="mimic-status" id="mimic-status" role="status" aria-live="polite"></span>
+      <div class="mimic-opts" id="mimic-opts" hidden>
+        <label class="check"><input type="checkbox" id="mimic-mirror" checked> กระจกเงา</label>
+        <label class="mimic-smooth" for="mimic-smooth">ความลื่นไหล <input type="range" id="mimic-smooth" min="0" max="100" step="5" value="50"></label>
+        <button type="button" class="mini" id="mimic-recal" title="ยืนนิ่งสักครู่เพื่อวัดท่าทางเริ่มต้นใหม่">ตั้งท่าใหม่</button>
+      </div>
+    </div>
+    <div class="cam-actions" id="cam-actions">
+      <h3>ท่าทางและมีม</h3>
+      <div class="cam-actions-body">
+        <div class="cam-opt">
+          <label for="cam-sens">ความไว</label>
+          <select id="cam-sens"><option value="low">ต่ำ</option><option value="normal" selected>ปกติ</option><option value="high">สูง</option></select>
+        </div>
+        <label class="check cam-ask"><input type="checkbox" id="cam-ask"> ให้ท่าทางส่งคำถาม (มีค่าใช้จ่าย)</label>
+        <p class="cam-hint" id="cam-ask-hint">ส่งคำถามเมื่อค้างท่า 0.8 วินาที เว้นอย่างน้อย 10 วินาทีต่อคำถาม มีค่าใช้บริการโมเดล</p>
+        <div class="cam-opt">
+          <label for="meme-speed">ความเร็วมีม</label>
+          <select id="meme-speed"><option value="normal" selected>ปกติ</option><option value="fast">เร็ว</option><option value="ultra">เร็วสุด</option></select>
+        </div>
+        <div class="cam-rows" id="cam-rows" role="list"></div>
+        <p class="cam-hint">มีมแสดงเป็นภาพสั้น ๆ ไม่เกิน 2 ครั้งต่อวินาที ปุ่มลองท่าใช้ได้โดยไม่เปิดกล้องและไม่ส่งคำถาม</p>
+        <div class="meme-user-opts">
+          <div class="cam-opt">
+            <button type="button" class="mini" id="meme-add">เพิ่มมีม</button>
+            <button type="button" class="mini" id="meme-export" title="ดาวน์โหลดรายการมีมเป็น JSON">ส่งออกรายการ</button>
+            <input type="file" id="meme-file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+          </div>
+          <p class="cam-hint" id="meme-user-hint">ลากภาพ PNG, JPG หรือ WebP มาวางได้ สูงสุด 40 ไฟล์ ไฟล์ละ 2 MB เก็บเฉพาะในเบราว์เซอร์นี้</p>
+          <label class="check"><input type="checkbox" id="meme-media"> อนุญาตมีม GIF / วิดีโอ / เสียง</label>
+          <p class="meme-warn" id="meme-media-warn" hidden>คลิปเคลื่อนไหวอาจมีแสงกะพริบที่กระตุ้นอาการชักในผู้ไวต่อแสง เปิดเมื่อเหมาะกับผู้ชมเท่านั้น คลิปแสดงไม่เกิน 1.5 วินาที</p>
+          <p class="cam-hint" id="meme-user-status" role="status" aria-live="polite"></p>
+          <div class="meme-thumbs" id="meme-thumbs"></div>
+        </div>
+      </div>
+    </div>
+  </dialog>
 <script type="module" src="/static/fly.js"></script>
   <dialog class="meme-dialog" id="meme-dialog" aria-labelledby="meme-dialog-title">
     <form method="dialog" id="meme-dialog-form">

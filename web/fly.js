@@ -1,6 +1,7 @@
 import { STAGES, newState, applyEvent, parseNdjsonStream } from '/static/fly-stream.js';
 import { createScene } from '/static/fly-scene.js';
 import { createFlyAudio } from '/static/fly-audio.js';
+import { createComposer } from '/static/fly-composer.js';
 import { flySpeech } from '/static/fly-speak.js';
 import { tokenizeJson, sessionExport, exportFileName, byteSize, formatBytes, makeEventRecord, collapseState, toggleCollapsed, collapseAll, expandAll, allCollapsed, LARGE_BYTES } from '/static/fly-json.js';
 import { createMimic, RIG_KEYS } from '/static/fly-mimic.js';
@@ -541,6 +542,8 @@ function renderFinal(f) {
 async function ask(text) {
   text = text.trim();
   if (!text) return;
+  cancelCountdown();
+  if (rec.active) stopRecording(true);
   lastText = text;
   engine.unlock();
   cancelVoice();
@@ -864,60 +867,17 @@ $('toggle-cards').addEventListener('click', () => {
   syncToggleAll();
 });
 
-// ---- Text input ----
-$('send').addEventListener('click', () => ask($('q').value || $('q').placeholder));
-$('q').addEventListener('keydown', (e) => {
-  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); ask($('q').value || $('q').placeholder); }
-});
 $('retry').addEventListener('click', () => ask(lastText));
-
-// ---- Mode toggle ----
-function setMode(mode) {
-  const voice = mode === 'voice';
-  $('tab-text').setAttribute('aria-selected', String(!voice));
-  $('tab-voice').setAttribute('aria-selected', String(voice));
-  $('tab-text').tabIndex = voice ? -1 : 0;
-  $('tab-voice').tabIndex = voice ? 0 : -1;
-  $('pane-text').hidden = voice;
-  $('pane-voice').hidden = !voice;
-  if (!voice && rec.active) stopRecording(true);
-}
-$('tab-text').addEventListener('click', () => setMode('text'));
-$('tab-voice').addEventListener('click', () => setMode('voice'));
-for (const t of [$('tab-text'), $('tab-voice')]) {
-  t.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') { const v = t.id === 'tab-text'; setMode(v ? 'voice' : 'text'); (v ? $('tab-voice') : $('tab-text')).focus(); }
-  });
-}
 
 // ---- Voice ----
 const rec = { active: false, stream: null, recorder: null, chunks: [], ctx: null, raf: 0, t0: 0, discard: false };
-let countdownTimer = null;
-
-function setMicStatus(msg) { $('mic-status').textContent = msg; }
-
-function cancelCountdown() {
-  clearInterval(countdownTimer);
-  $('confirm-row').hidden = true;
-  $('countdown').textContent = '';
-}
-function showTranscript(text) {
-  const box = $('transcript');
-  box.hidden = false;
-  box.value = text;
-  $('confirm-row').hidden = false;
-  let n = 4;
-  const label = () => { $('countdown').textContent = `Sending in ${n}s...`; };
-  label();
-  clearInterval(countdownTimer);
-  countdownTimer = setInterval(() => {
-    n -= 1;
-    if (n <= 0) { cancelCountdown(); ask(box.value); } else label();
-  }, 1000);
-}
-$('transcript').addEventListener('input', () => { if (!$('confirm-row').hidden) { clearInterval(countdownTimer); $('countdown').textContent = 'Edited - press Send now'; } });
-$('cancel-send').addEventListener('click', () => { cancelCountdown(); setMicStatus('Cancelled. Edit the transcript and press Send, or record again.'); $('confirm-row').hidden = false; $('countdown').textContent = ''; });
-$('send-voice').addEventListener('click', () => { cancelCountdown(); ask($('transcript').value); });
+const { setMicStatus, cancelCountdown, showTranscript } = createComposer({
+  question: $('q'), send: $('send'), mic: $('mic'), activity: $('voice-activity'), status: $('mic-status'),
+  confirmation: $('confirm-row'), countdown: $('countdown'), cancel: $('cancel-send'),
+  settings: $('chat-settings'), settingsToggle: $('chat-settings-toggle'), settingsClose: $('chat-settings-close'),
+  onAsk: ask,
+  onMic: () => { engine.unlock(); if (rec.active) stopRecording(); else if (!$('send').disabled) startRecording(); },
+});
 
 function pickMime() {
   if (typeof MediaRecorder === 'undefined') return null;
@@ -932,14 +892,21 @@ function fmt(ms) { const s = Math.floor(ms / 1000); return `${Math.floor(s / 60)
 async function startRecording() {
   cancelCountdown();
   if (!navigator.mediaDevices?.getUserMedia || pickMime() === null) {
-    setMicStatus('This browser cannot record audio. Switch to Text input.');
+    setMicStatus('เบราว์เซอร์นี้ใช้ไมค์ไม่ได้ พิมพ์ข้อความได้เลย');
     return;
   }
+  $('mic').disabled = true;
+  setMicStatus('กำลังเปิดไมค์…');
   try {
     rec.stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
   } catch (err) {
     const denied = err && (err.name === 'NotAllowedError' || err.name === 'SecurityError');
-    setMicStatus(denied ? 'Microphone permission was denied. Allow it in the browser, or use Text.' : 'No microphone found or it is busy. Use Text instead.');
+    setMicStatus(denied ? 'กรุณาอนุญาตไมค์ในเบราว์เซอร์ หรือพิมพ์ข้อความได้เลย' : 'ไม่พบไมค์หรือไมค์กำลังถูกใช้งาน พิมพ์ข้อความได้เลย');
+    return;
+  } finally { $('mic').disabled = false; }
+  if ($('send').disabled || document.hidden) {
+    rec.stream?.getTracks().forEach((track) => track.stop());
+    setMicStatus('');
     return;
   }
   const mime = pickMime();
@@ -969,33 +936,34 @@ async function startRecording() {
     loop();
   } catch (_) { rec.t0 = performance.now(); }
   rec.active = true;
+  $('voice-activity').classList.add('recording');
   $('mic').setAttribute('aria-pressed', 'true');
-  $('mic').setAttribute('aria-label', 'Stop recording');
-  setMicStatus('Listening... click again to stop.');
+  $('mic').setAttribute('aria-label', 'หยุดพูด');
+  setMicStatus('กำลังฟัง… กดไมค์อีกครั้งเมื่อพูดจบ');
   fly('listening');
 }
 
 function stopRecording(discard = false) {
   if (!rec.active) return;
   rec.active = false;
+  $('voice-activity').classList.remove('recording');
   rec.discard = discard;
   cancelAnimationFrame(rec.raf);
   $('meter-bar').style.width = '0%';
   $('mic').setAttribute('aria-pressed', 'false');
-  $('mic').setAttribute('aria-label', 'Start recording');
+  $('mic').setAttribute('aria-label', 'เปิดไมค์');
   engine.setDucked(false);
   try { rec.recorder.stop(); } catch (_) { /* already stopped */ }
   rec.stream?.getTracks().forEach((t) => t.stop());
   rec.ctx?.close().catch(() => {});
   fly('idle');
 }
-$('mic').addEventListener('click', () => { engine.unlock(); if (rec.active) stopRecording(); else startRecording(); });
 
 async function onRecorded() {
   if (rec.discard) return;
   const blob = new Blob(rec.chunks, { type: rec.recorder.mimeType || 'audio/webm' });
-  if (blob.size < 200) { setMicStatus('Nothing was recorded. Try again.'); return; }
-  setMicStatus('Transcribing...');
+  if (blob.size < 200) { setMicStatus('ยังไม่ได้ยินเสียง ลองพูดอีกครั้ง'); return; }
+  setMicStatus('กำลังแปลงเสียงเป็นข้อความ…');
   const fd = new FormData();
   const ext = blob.type.includes('ogg') ? 'ogg' : blob.type.includes('mp4') ? 'm4a' : 'webm';
   fd.append('audio', blob, `speech.${ext}`);
@@ -1008,28 +976,28 @@ async function onRecorded() {
       throw Object.assign(new Error(`stt ${res.status}`), { status: res.status, code });
     }
     const j = await res.json();
-    if (!j.text || !j.text.trim()) { setMicStatus('No speech detected. Try again.'); return; }
-    setMicStatus('Heard you. Check the text, it will send in a moment.');
+    if (!j.text || !j.text.trim()) { setMicStatus('ยังไม่ได้ยินคำพูด ลองอีกครั้ง'); return; }
+    setMicStatus('ได้ยินแล้ว · ตรวจข้อความก่อนส่งได้เลย');
     showTranscript(j.text.trim());
   } catch (err) {
-    browserSpeechFallback(err.status === 503 ? 'Server speech-to-text is not configured.' : 'Server speech-to-text failed.');
+    browserSpeechFallback('แปลงเสียงไม่สำเร็จ');
   }
 }
 
 function browserSpeechFallback(reason) {
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!SR) { setMicStatus(`${reason} This browser has no speech recognition either. Please use Text.`); return; }
-  setMicStatus(`${reason} Using browser speech recognition: speak now.`);
+  if (!SR) { setMicStatus(`${reason} พิมพ์ข้อความได้เลย`); return; }
+  setMicStatus('กำลังใช้ไมค์ของเบราว์เซอร์ พูดได้เลย');
   const r = new SR();
   r.lang = 'th-TH';
   r.interimResults = false;
   r.maxAlternatives = 1;
   fly('listening');
   engine.setDucked(true);
-  r.onresult = (e) => { const t = e.results[0][0].transcript; setMicStatus('Heard you. Check the text, it will send in a moment.'); showTranscript(t); };
-  r.onerror = (e) => setMicStatus(e.error === 'not-allowed' ? 'Microphone permission was denied.' : `Browser speech recognition failed (${e.error}). Use Text.`);
+  r.onresult = (e) => { const t = e.results[0][0].transcript; setMicStatus('ได้ยินแล้ว · ตรวจข้อความก่อนส่งได้เลย'); showTranscript(t); };
+  r.onerror = (e) => setMicStatus(e.error === 'not-allowed' ? 'กรุณาอนุญาตไมค์ในเบราว์เซอร์' : 'แปลงเสียงไม่สำเร็จ พิมพ์ข้อความได้เลย');
   r.onend = () => { engine.setDucked(false); fly('idle'); };
-  try { r.start(); } catch (_) { setMicStatus('Could not start browser speech recognition. Use Text.'); }
+  try { r.start(); } catch (_) { setMicStatus('เปิดไมค์ไม่สำเร็จ พิมพ์ข้อความได้เลย'); }
 }
 
 addEventListener('pagehide', () => { if (rec.active) stopRecording(true); });
@@ -1277,7 +1245,9 @@ function onGesture(ev, test = false) {
     case 'mute': $('mute').click(); break;
     case 'preset1': case 'preset2': case 'preset3': {
       const n = Number(plan.action.slice(-1)) - 1;
-      setMode('text'); $('q').value = PRESETS[n]; extra = extra || `preset ${n + 1} loaded, press Send`;
+      cancelCountdown(); if (rec.active) stopRecording(true);
+      $('q').value = PRESETS[n]; $('q').dispatchEvent(new Event('input')); $('q').focus();
+      extra = extra || `preset ${n + 1} loaded, press Send`;
       break;
     }
     case 'ask': {
@@ -1313,13 +1283,14 @@ const cam = createCamera({
   onState: (s, msg, st) => {
     const on = s === 'on';
     $('cam-toggle').setAttribute('aria-pressed', String(on || s === 'starting'));
+    $('cam-toggle').setAttribute('aria-label', on || s === 'starting' ? 'ปิดกล้อง' : 'เปิดกล้อง');
     $('cam-toggle-label').textContent = on || s === 'starting' ? 'กล้องเปิดอยู่' : 'เปิดกล้อง';
     $('cam-box').hidden = !(on || s === 'starting');
     $('cam-mockbadge').hidden = !camMock;
     $('cam-timeline').hidden = !camMock;
     if (!on) $('mock-caption').hidden = true;
     $('cam-mode').textContent = st.mode === 'full' ? 'ท่าทางและมือ' : st.mode === 'motion-only' ? 'ตรวจการเคลื่อนไหว' : st.mode === 'mock' ? 'จำลองท่าทาง' : '';
-    camStatus(msg, s === 'error');
+    camStatus(s === 'on' ? '' : msg, s === 'error');
     if (!on) { $('cam-fps').textContent = '0 fps'; flyApi.setAttention(null); memes.clear(); }
   },
 });

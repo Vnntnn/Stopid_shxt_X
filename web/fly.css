@@ -11,14 +11,6 @@ body { overflow: hidden; }
 .frame { position: fixed; inset: 14px; border: 3px solid #d2ac5d; border-radius: 18px; overflow: hidden;
   background: #f6e6be url('/static/images/thai-ceremonial-garden.png') center / cover no-repeat;
   box-shadow: 0 0 0 1px #735223, 0 12px 50px rgba(0, 0, 0, 0.25), inset 0 0 0 3px #fff0c1; }
-.garden-title { position: absolute; top: 24px; left: 28px; display: flex; align-items: center; gap: 10px; z-index: 3; pointer-events: none;
-  padding: 8px 16px 10px 8px; border: 1px solid #d6b975; border-radius: 8px 24px 8px 24px;
-  background: linear-gradient(135deg, rgba(255,249,229,.96), rgba(246,222,170,.93)); box-shadow: 0 4px 20px rgba(96,61,18,.15); }
-.garden-title img { width: 70px; height: auto; }
-.garden-title p { margin: 0 0 2px; color: #865f28; font-size: 10px; font-weight: 600; letter-spacing: .12em; }
-.garden-title h1 { margin: 0; color: #744b1e; font: 700 28px/1.4 "Noto Serif Thai", Georgia, serif;
-  text-shadow: 0 1px 0 #fff6d8, 0 2px 0 #d9b976; }
-.garden-title span { color: #7b5b42; font-size: 12px; }
 .stage { position: absolute; inset: 0; z-index: 0; isolation: isolate; }
 .stage canvas { display: block; position: relative; z-index: 1; }
 .fallback { position: absolute; z-index: 2; top: 40%; left: 50%; transform: translateX(-50%); max-width: 360px; text-align: center; color: var(--muted); padding: 16px; }
@@ -62,7 +54,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .mic-info { flex: 1; min-width: 0; font-size: 13px; color: var(--muted); }
 .meter { height: 8px; border-radius: 6px; background: rgba(255,255,255,.1); margin: 6px 0 2px; overflow: hidden; }
 .meter span { display: block; height: 100%; width: 0; background: var(--accent); transition: width .06s linear; }
-#transcript { margin-top: 10px; }
 .empty { color: var(--muted); margin: 6px 0; }
 .stages { list-style: none; margin: 8px 0; padding: 0; display: grid; gap: 4px; }
 .stages > li { display: grid; grid-template-columns: 22px 1fr auto; min-width: 0; gap: 8px; align-items: center; color: var(--muted); }
@@ -95,11 +86,6 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   .frame { background: linear-gradient(180deg, #f9ebc9, #f3e2bd); }
   .stage { position: relative; inset: auto; height: 36vh; min-height: 240px; flex: none; overflow: hidden; border-radius: 20px 20px 0 0; }
   .stage { background: url('/static/images/thai-ceremonial-garden.png') center / cover no-repeat; border-radius: 12px; margin: 0 8px; }
-  .garden-title { position: relative; inset: auto; margin: 16px 12px 10px; gap: 4px; }
-  .garden-title img { width: 50px; }
-  .garden-title h1 { font-size: 22px; }
-  .garden-title span { font-size: 11px; }
-  .garden-title p { font-size: 8px; }
   .badge-state { left: auto; right: 12px; top: 18px; transform: none; font-size: 10px; padding: 2px 8px; }
   .panel { position: relative; inset: auto; width: auto; max-height: none; margin: 10px; }
   .you { order: 1; } .out { order: 2; overflow: visible; }
@@ -437,4 +423,55 @@ button.jcaret:hover { background: #eee2c5; }
 @media (max-width: 800px) {
   .you { max-height: none; overflow: visible; }
   .cam-box { width: 100%; inset: auto; }
+}
+
+/* A single compact chat composer, with media actions always within reach. */
+.composer.you { top: auto; bottom: 18px; right: 18px; width: min(360px, 40vw); padding: 12px;
+  border: 1px solid #c7a265; border-radius: 16px; background: rgba(255,248,229,.97);
+  box-shadow: 0 6px 24px rgba(87,47,20,.16); }
+.composer::before { display: none; }
+.composer-head { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.composer-head h2 { margin: 0; padding: 0; font-family: inherit; font-weight: 600; font-size: 12px; line-height: 1.5; color: #70417c; }
+.composer-dot { width: 6px; height: 6px; border-radius: 50%; background: #84915e; }
+.composer-channel { margin-left: auto; color: #a68a60; font-size: 11px; }
+.composer #q { display: block; min-height: 56px; max-height: 112px; padding: 5px 0; resize: none;
+  border: 0; border-radius: 0; background: transparent; font-size: 13px; line-height: 1.5; box-shadow: none; }
+.composer #q:focus-visible { outline: none; }
+.composer:focus-within { border-color: #70417c; box-shadow: 0 0 0 2px rgba(112,65,124,.12), 0 6px 24px rgba(87,47,20,.16); }
+.composer-toolbar { display: flex; align-items: center; gap: 3px; margin-top: 5px; padding-top: 6px; border-top: 1px solid var(--line); }
+.composer-icon, .composer-icon.mic, .composer-icon.cam-toggle { display: grid; place-items: center;
+  width: 32px; height: 32px; flex: none; padding: 0; margin: 0; border: 0; border-radius: 8px; background: transparent; color: #7a674a; }
+.composer-icon:hover { color: #70417c; background: #eee0ed; }
+.composer-icon[aria-pressed="true"] { color: #fff0ca; background: #70417c; animation: none; }
+.composer-icon.mic[aria-pressed="true"] { background: #ad4141; }
+.composer-icon.composer-send { margin-left: auto; color: #fff0ca; background: #70417c; box-shadow: none; }
+.composer-icon.composer-send:hover { background: #593264; }
+.composer-shortcut { margin-left: auto; color: #9b8665; font-size: 10px; white-space: nowrap; }
+.composer-icon.composer-send { margin-left: 6px; }
+.voice-activity { display: grid; grid-template-columns: minmax(0,1fr) auto; gap: 4px; margin-top: 8px; color: var(--muted); font-size: 11px; }
+.voice-activity .timer, .voice-activity .meter { display: none; }
+.voice-activity.recording .timer { display: block; color: #ad4141; }
+.voice-activity.recording .meter { display: block; grid-column: 1 / -1; height: 3px; margin: 0; }
+.voice-confirm { display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; font-size: 11px; color: var(--muted); }
+.voice-confirm button { background: transparent; border: 0; padding: 2px; color: #70417c; }
+.composer .cam-status { margin: 6px 0 0; font-size: 11px; }
+.composer .cam-box { display: grid; grid-template-columns: 112px minmax(0,1fr); gap: 3px 8px;
+  padding: 0; margin: 8px 0; border: 0; background: transparent; backdrop-filter: none; }
+.composer .cam-view { grid-row: 1 / 5; width: 112px; margin: 0; align-self: start; }
+.composer .cam-on { font-size: 8px; padding: 2px 5px; letter-spacing: 0; left: 4px; top: 4px; }
+.composer .cam-on i { width: 5px; height: 5px; }
+.composer .cam-mockbadge { font-size: 8px; padding: 1px 4px; letter-spacing: 0; }
+.composer .cam-line { margin: 0; gap: 4px; font-size: 10px; }
+.composer .cam-last { margin: 0; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.composer .cam-note { margin: 0; font-size: 9px; line-height: 1.4; }
+.composer .cam-timeline { display: none; }
+.chat-settings { width: min(420px, 92vw); max-height: 80vh; overflow: auto; }
+.chat-settings-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.chat-settings-head h2 { margin: 0; font-size: 16px; color: #70417c; }
+.chat-settings .cam-actions h3 { margin: 6px 0; font-size: 13px; }
+.chat-settings .cam-actions-body { max-height: none; overflow: visible; }
+.chat-settings .mimic-sub { display: none; }
+@media (max-width: 800px) {
+  .composer.you { position: relative; inset: auto; width: auto; margin: 10px; }
+  .stage { margin-top: 8px; }
 }

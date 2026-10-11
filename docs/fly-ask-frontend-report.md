@@ -9,6 +9,11 @@
 > assets. Tests cover actual GLB motion, scene hooks/landing with a stub renderer and camera lifecycle;
 > live HTTP checks confirm all camera assets are served. Real webcam tracking and visual rendering in
 > the merged theme have not been verified. The screenshots and browser checks below describe earlier versions.
+>
+> **Compact chat revision:** the Fly Ask header is removed. A small composer contains one message field
+> and direct microphone/camera/send controls; no input tabs. Speech writes into the same field, editing
+> cancels its countdown, and manually sending cannot trigger a later duplicate send. Gesture, meme and
+> Copy me options live in a separate settings dialog. Composer behavior is tested with DOM control doubles.
 
 ## What was built
 A dark full-screen page (white rounded frame) with a procedural three.js fly in the centre, a "You" box top right
