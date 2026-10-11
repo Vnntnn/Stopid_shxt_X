@@ -20,3 +20,6 @@ On-Fly-Jev/logo.png
 On-Fly-Jev/.gitattributes
 On-Fly-Jev/eval_fast_decisions*.json
 On-Fly-Jev/eval_fast_decisions.bat
+
+# Camera assets (MediaPipe runtime + models): fetched by scripts/fetch_camera_assets.sh
+web/vendor/mediapipe/
