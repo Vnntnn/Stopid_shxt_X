@@ -1,5 +1,6 @@
 // Procedural 3D fly scene (three.js primitives only, no external assets).
 import * as THREE from 'three';
+import { RIG_KEYS, IDLE_RIG, clampRig, smoothRig, legAngles, wingAngles, lerp, smooth01 } from '/static/fly-mimic.js';
 
 const FONT = '"Noto Sans Thai", "Sarabun", system-ui, sans-serif';
 const PADS = {
@@ -60,7 +61,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
   try {
     renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   } catch (err) {
-    return { ok: false, error: err, setState() {}, setCandidates() {}, dispose() {} };
+    return { ok: false, error: err, setState() {}, setCandidates() {}, dispose() {}, setPose() {}, setPoseWeight() {}, setOffsets() {}, setFrameHook() {}, getPose() { return { ...clampRig(IDLE_RIG), weight: 0 }; } };
   }
   const motion = reducedMotion ? 0.35 : 1;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
@@ -139,13 +140,16 @@ export function createScene(container, { reducedMotion = false } = {}) {
   abdomen.position.set(0, 0, -1.05);
   const thorax = new THREE.Mesh(new THREE.SphereGeometry(1, 24, 18), bodyMat);
   thorax.scale.set(0.58, 0.55, 0.7);
+  const headGrp = new THREE.Group(); // pivot for the look direction
+  headGrp.position.set(0, 0, 0.5);
   const head = new THREE.Mesh(new THREE.SphereGeometry(0.42, 20, 16), bodyMat);
-  head.position.set(0, 0.02, 0.85);
+  head.position.set(0, 0.02, 0.35);
   const eyeGeo = new THREE.SphereGeometry(0.34, 20, 16);
   const eyeL = new THREE.Mesh(eyeGeo, eyeMat);
   const eyeR = new THREE.Mesh(eyeGeo, eyeMat);
-  eyeL.position.set(-0.3, 0.08, 1.05);
-  eyeR.position.set(0.3, 0.08, 1.05);
+  eyeL.position.set(-0.3, 0.08, 0.55);
+  eyeR.position.set(0.3, 0.08, 0.55);
+  headGrp.add(head, eyeL, eyeR);
   const stripeGeo = new THREE.TorusGeometry(0.58, 0.04, 8, 24);
   const stripes = [0.2, -0.3, -0.8].map((z) => {
     const s = new THREE.Mesh(stripeGeo, new THREE.MeshStandardMaterial({ color: 0x5a3cff, emissive: 0x5a3cff, emissiveIntensity: 0.6 }));
@@ -153,7 +157,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     s.scale.set(1.0 - Math.abs(z) * 0.1, 0.9, 1);
     return s;
   });
-  fly.add(abdomen, thorax, head, eyeL, eyeR, ...stripes);
+  fly.add(abdomen, thorax, headGrp, ...stripes);
 
   const wingGeo = new THREE.CircleGeometry(1, 28);
   const makeWing = (side) => {
@@ -166,6 +170,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     w.position.set(side * 0.95, 0, -0.3);
     w.rotation.z = 0;
     pivot.add(w);
+    pivot.userData.mesh = w;
     fly.add(pivot);
     return pivot;
   };
@@ -173,26 +178,64 @@ export function createScene(container, { reducedMotion = false } = {}) {
   const wingR = makeWing(1);
 
   const legGeo = new THREE.CylinderGeometry(0.018, 0.012, 1, 5);
-  const legs = [];
+  const legs = [];        // the four back/middle legs (idle wiggle)
+  const frontLegs = [];   // the two articulated front legs: hip -> upper segment -> knee -> lower segment -> tip
+  const frontGeo = new THREE.CylinderGeometry(0.055, 0.042, 1, 10);
+  const jointGeo = new THREE.SphereGeometry(0.075, 12, 10);
+  const tipGeo = new THREE.SphereGeometry(0.12, 14, 12);
+  const L1 = 0.62, L2 = 0.8;
   for (const side of [-1, 1]) {
     for (let i = 0; i < 3; i++) {
       const z = 0.35 - i * 0.35;
-      const upper = new THREE.Mesh(legGeo, legMat);
-      const lower = new THREE.Mesh(legGeo, legMat);
-      upper.scale.y = 0.7;
-      lower.scale.y = 0.8;
       const hip = new THREE.Group();
       hip.position.set(side * 0.35, -0.3, z);
-      upper.position.set(side * 0.28, -0.05, 0);
-      upper.rotation.z = side * -1.1;
-      lower.position.set(side * 0.62, -0.42, 0);
-      lower.rotation.z = side * 0.35;
-      hip.add(upper, lower);
-      hip.rotation.y = side * (i - 1) * 0.35;
+      if (i === 0) {
+        const frontMat = new THREE.MeshStandardMaterial({ color: 0x6a5cff, roughness: 0.45, emissive: 0x5a3cff, emissiveIntensity: 0.45 });
+        const p1 = new THREE.Group();
+        const m1 = new THREE.Mesh(frontGeo, frontMat);
+        m1.scale.y = L1; m1.position.y = L1 / 2;
+        p1.add(m1);
+        const knee = new THREE.Group();
+        knee.position.y = L1;
+        const joint = new THREE.Mesh(jointGeo, frontMat);
+        const m2 = new THREE.Mesh(frontGeo, frontMat);
+        m2.scale.y = L2; m2.position.y = L2 / 2;
+        const tipMat = new THREE.MeshStandardMaterial({ color: 0xffe14d, roughness: 0.4, emissive: 0xffc400, emissiveIntensity: 0.1 });
+        const tip = new THREE.Mesh(tipGeo, tipMat);
+        tip.position.y = L2;
+        knee.add(joint, m2, tip);
+        p1.add(knee);
+        hip.add(p1);
+        frontLegs.push({ side, hip, p1, knee, m2, tip, tipMat });
+      } else {
+        const upper = new THREE.Mesh(legGeo, legMat);
+        const lower = new THREE.Mesh(legGeo, legMat);
+        upper.scale.y = 0.7;
+        lower.scale.y = 0.8;
+        upper.position.set(side * 0.28, -0.05, 0);
+        upper.rotation.z = side * -1.1;
+        lower.position.set(side * 0.62, -0.42, 0);
+        lower.rotation.z = side * 0.35;
+        hip.add(upper, lower);
+        hip.rotation.y = side * (i - 1) * 0.35;
+        legs.push(hip);
+      }
       fly.add(hip);
-      legs.push(hip);
     }
   }
+  // Pose a front leg from (raise, curl, swing): angles are elevations above the outward horizontal.
+  function poseFrontLeg(f, raise, curl, swing) {
+    const a = legAngles(raise, curl, swing);
+    const th = (phi) => Math.atan2(-f.side * Math.cos(phi), Math.sin(phi)); // rotation.z that points the +y axis along (side*cos, sin)
+    const t1 = th(a.phi1), t2 = th(a.phi2);
+    f.p1.rotation.z = t1;
+    f.knee.rotation.z = t2 - t1;
+    f.m2.scale.y = L2 * a.lowerScale; f.m2.position.y = (L2 * a.lowerScale) / 2;
+    f.tip.position.y = L2 * a.lowerScale;
+    f.hip.rotation.y = -f.side * 0.35 * (1 - 0.6 * raise);
+    f.tipMat.emissiveIntensity = 0.1 + raise * 0.7;
+  }
+  for (const f of frontLegs) poseFrontLeg(f, 0, 0, 0);
   const glowTex = glowTexture();
   const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x7a5cff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
   glow.scale.set(5, 5, 1);
@@ -220,6 +263,27 @@ export function createScene(container, { reducedMotion = false } = {}) {
   let dive = null; // {curve, t, dur, padId}
   const tmp = new THREE.Vector3();
   const tmp2 = new THREE.Vector3();
+
+  // ---- Public rig hooks (used by fly.js "Copy me" mode and the reactions) ----
+  // Pose rig: normalised parameters (see RIG_SPEC in fly-mimic.js), smoothed here. The pose weight blends from the scene's own
+  // state-machine look (0, exactly the old behaviour) to the rig (1). Offsets are additive extras (follow, reactions).
+  const rigTarget = { ...clampRig(IDLE_RIG) };
+  let rigCur = { ...clampRig(IDLE_RIG) };
+  let poseW = 0, poseWT = 0;
+  const offs = { dx: 0, dy: 0, yaw: 0, spin: 0, flap: 0, camX: 0 };
+  let frameHook = null;
+  let glowOp = 0.55;
+  let rigWasOn = false;
+  const LEG_PHASE = [1, 2, 4, 5];
+  function setPose(partial) {
+    if (!partial) return;
+    const c = clampRig({ ...rigTarget, ...partial });
+    for (const k of RIG_KEYS) rigTarget[k] = c[k];
+  }
+  function setPoseWeight(w) { poseWT = Math.min(1, Math.max(0, Number(w) || 0)); }
+  function setOffsets(o) { for (const k of Object.keys(offs)) offs[k] = o && Number.isFinite(o[k]) ? o[k] : 0; }
+  function setFrameHook(fn) { frameHook = typeof fn === 'function' ? fn : null; }
+  function getPose() { return { ...rigCur, weight: poseW }; }
 
   function setState(next, opts = {}) {
     if (next === 'deciding') {
@@ -278,6 +342,11 @@ export function createScene(container, { reducedMotion = false } = {}) {
     const dt = Math.min(clock.getDelta(), 0.05);
     const t = clock.elapsedTime;
     stateT += dt;
+    if (frameHook) { try { frameHook({ dt, t, state, landed }); } catch (_) { /* decoration only */ } }
+    rigCur = smoothRig(rigCur, rigTarget, dt, 16);
+    poseW += (poseWT - poseW) * Math.min(1, dt * (poseWT > poseW ? 6 : 4));
+    if (Math.abs(poseWT - poseW) < 1e-3) poseW = poseWT;
+    const W = poseW;
 
     // Target pose per state
     let freq = WING_FREQ[state] || 9;
@@ -345,10 +414,64 @@ export function createScene(container, { reducedMotion = false } = {}) {
     wingR.rotation.set(0, -sweep, -flap);
     wingL.rotation.z = flap + 0.15 * (1 - fold);
     wingR.rotation.z = -flap - 0.15 * (1 - fold);
-    const glowBase = state === 'listening' ? 0.8 : 0.5;
-    glow.material.opacity += (glowBase + Math.sin(t * 2) * 0.08 - glow.material.opacity) * Math.min(1, dt * 4);
+    glowOp += ((state === 'listening' ? 0.8 : 0.5) + Math.sin(t * 2) * 0.08 - glowOp) * Math.min(1, dt * 4);
+    let glowExtra = 0;
     // Subtle leg shuffle when landed
-    for (let i = 0; i < legs.length; i++) legs[i].rotation.x = landed ? 0 : Math.sin(t * 3 + i) * 0.05 * motion;
+    for (let i = 0; i < legs.length; i++) legs[i].rotation.x = landed ? 0 : Math.sin(t * 3 + LEG_PHASE[i]) * 0.05 * motion;
+
+    // Rig pose, blended over the state look by the pose weight (W = 0 leaves everything above untouched)
+    const rg = rigCur;
+    if (W > 1e-4) {
+      const mot = reducedMotion ? 0.6 : 1;
+      fly.rotation.z = lerp(fly.rotation.z, rg.roll * 0.8 * mot, W);
+      fly.rotation.x += W * rg.pitch * 0.5 * mot;
+      // wings: rig angles replace the state's flap/fold angles
+      for (const [pivot, side, spread, fl] of [[wingL, 1, rg.wingL, rg.flapL], [wingR, -1, rg.wingR, rg.flapR]]) {
+        const wa = wingAngles(spread);
+        const rigFlap = Math.sin(flapPhase * Math.PI * 2) * (fl * 0.75 + 0.02) * (reducedMotion ? 0.5 : 1);
+        const sw2 = lerp(fold * 1.2, wa.sweep, W);
+        const z0 = pivot.rotation.z * side; // the state's droop (flap + rest angle), sign-normalised
+        const z1 = -wa.lift + rigFlap;
+        pivot.rotation.y = side * sw2;
+        pivot.rotation.z = side * lerp(z0, z1, W);
+        const mesh = pivot.userData.mesh;
+        mesh.rotation.x = -Math.PI / 2 * (1 - W * wa.twist);
+        mesh.scale.x = lerp(1, wa.scale, W);
+      }
+      // front legs (raise 0 = the resting pose) and the wiggle of the other legs
+      for (const f of frontLegs) {
+        const key = f.side < 0 ? 'L' : 'R';
+        poseFrontLeg(f, W * rg['leg' + key], W * rg.curl, W * rg['swing' + key]);
+      }
+      const wig = lerp(0.05, 0.35 * rg.legWiggle, W) * motion, wf = lerp(3, 3 + 9 * rg.legWiggle, W);
+      for (let i = 0; i < legs.length; i++) {
+        legs[i].rotation.x = landed ? 0 : Math.sin(t * wf + LEG_PHASE[i]) * wig;
+        legs[i].rotation.z = (i < 2 ? -1 : 1) * 0.55 * rg.curl * W;
+      }
+      // crouch / stretch, hop, look direction, glow
+      const sq = rg.squash * W * mot;
+      fly.scale.set(0.78 * (1 + 0.22 * sq), 0.78 * (1 - 0.38 * sq), 0.78 * (1 + 0.22 * sq));
+      fly.position.y += rg.hop * 0.6 * W * mot;
+      headGrp.rotation.y = rg.lookX * 0.6 * W;
+      headGrp.rotation.x = rg.lookY * 0.4 * W;
+      glowExtra = rg.glow * W;
+    } else if (rigWasOn) {
+      // back to the exact state look
+      for (const f of frontLegs) poseFrontLeg(f, 0, 0, 0);
+      for (const h of legs) h.rotation.z = 0;
+      fly.scale.setScalar(0.78);
+      headGrp.rotation.set(0, 0, 0);
+      for (const [pivot, side] of [[wingL, 1], [wingR, -1]]) { const m = pivot.userData.mesh; m.rotation.x = -Math.PI / 2; m.scale.x = 1; }
+    }
+    rigWasOn = W > 1e-4;
+    glow.material.opacity = glowOp + glowExtra * 0.45;
+    glow.material.color.setHex(glowExtra > 0.01 ? 0xffe14d : 0x7a5cff);
+    glow.scale.setScalar(5 + glowExtra * 2.5);
+
+    // Additive extras from the page (attention follow, reactions): the scene recomputes everything each frame, so they never accumulate
+    fly.position.x += offs.dx; fly.position.y += offs.dy;
+    fly.rotation.y += offs.yaw + offs.spin;
+    if (offs.flap > 0.05) { const w = Math.sin(t * 46 * Math.PI) * 0.85 * offs.flap; wingL.rotation.z += w; wingR.rotation.z -= w; }
 
     // Pulse ring
     if (state === 'listening') {
@@ -374,7 +497,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     if (lastWinner === null) { refreshWinnerLabels(); lastWinner = true; }
 
     // Camera drift
-    camera.position.set(camBase.x + Math.sin(t * 0.25) * 0.7 * motion, camBase.y + Math.sin(t * 0.19) * 0.3 * motion, camBase.z);
+    camera.position.set(camBase.x - offs.camX + Math.sin(t * 0.25) * 0.7 * motion, camBase.y + Math.sin(t * 0.19) * 0.3 * motion, camBase.z);
     camera.lookAt(0, -0.2, 0);
     stars.rotation.y = t * 0.01 * motion;
 
@@ -398,5 +521,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     renderer.domElement.remove();
   }
 
-  return { ok: true, setState, setCandidates, dispose, get state() { return state; }, get landed() { return landed; } };
+  return { ok: true, setState, setCandidates, dispose, setPose, setPoseWeight, setOffsets, setFrameHook, getPose, get state() { return state; }, get landed() { return landed; },
+    // true when the scene's own state machine is not mid-manoeuvre: idle, sitting on the pad, or hovering after the spin
+    get settled() { return state === 'idle' || (state === 'deciding' && landed) || (state === 'inconclusive' && spin < 0.05); } };
 }

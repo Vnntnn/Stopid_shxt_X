@@ -307,6 +307,29 @@ export function createFlyAudio(opts = {}) {
     return true;
   }
 
+  // Silly "boing" for a Copy me hop and a rubber-duck "squeak" for a raised leg. Level >= 1 only; honour mute, ducking and a hidden tab.
+  function playBoing() {
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const o = osc('triangle', 220); const gn = gainNode(0.0001);
+    o.frequency.setValueAtTime(180, t0); o.frequency.exponentialRampToValueAtTime(620, t0 + 0.09); o.frequency.exponentialRampToValueAtTime(260, t0 + 0.38);
+    const lfo = osc('sine', 22); const lg = gainNode(40); link(lfo, lg, o.frequency); lfo.start(t0);
+    envelope(gn.gain, t0, 0.28, 0.01, 0.08, 0.28);
+    link(o, gn, master.bus); o.start(t0);
+    finish([o, lfo], t0 + 0.45);
+    return true;
+  }
+  function playSqueak() {
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const o = osc('square', 900); const gn = gainNode(0.0001); const f = bp(2400, 2.5);
+    o.frequency.setValueAtTime(900, t0); o.frequency.exponentialRampToValueAtTime(2100, t0 + 0.07); o.frequency.exponentialRampToValueAtTime(1500, t0 + 0.14);
+    envelope(gn.gain, t0, 0.14, 0.005, 0.04, 0.1);
+    link(o, f, gn, master.bus); o.start(t0);
+    finish([o], t0 + 0.2);
+    return true;
+  }
+
   // ---- fly voice ----
   function shaperCurve() {
     const n = 256, c = new Float32Array(n), k = 12;
@@ -495,6 +518,8 @@ export function createFlyAudio(opts = {}) {
     speakFallback,
     playJingle,
     playBoom,
+    playBoing,
+    playSqueak,
     stopVoice,
     stopAll,
     dispose,
