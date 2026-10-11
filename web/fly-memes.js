@@ -137,6 +137,7 @@ export function createMemeOverlay({ layer, live, byGesture, reduced = false, lim
     const card = doc.createElement('div');
     card.className = 'meme ' + (entry.type === 'image' ? 'meme-image' : 'meme-card');
     card.dataset.theme = entry.colorTheme;
+    card.setAttribute('aria-hidden', 'true'); // the caption is announced through the live region instead
     if (reduced) card.classList.add('static');
     const [c1, c2] = THEMES[entry.colorTheme] || THEMES[DEFAULT_THEME];
     card.style.setProperty('--c1', c1); card.style.setProperty('--c2', c2);
@@ -146,6 +147,16 @@ export function createMemeOverlay({ layer, live, byGesture, reduced = false, lim
       img.alt = entry.caption || 'meme';
       img.decoding = 'async';
       img.addEventListener('error', () => { if (current === card) { card.className = 'meme meme-card' + (reduced ? ' static' : ''); img.remove(); addText(card, { caption: entry.caption || 'MEME', emoji: '🖼️' }); } });
+      if (reduced && /\.(gif|webp|avif)$/i.test(entry.src)) {
+        // Animated formats must not move under prefers-reduced-motion: keep only the first frame on a canvas.
+        img.addEventListener('load', () => {
+          try {
+            const c = doc.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight; c.className = 'meme-still';
+            c.getContext('2d').drawImage(img, 0, 0); c.setAttribute('role', 'img'); c.setAttribute('aria-label', entry.caption || 'meme');
+            img.replaceWith(c);
+          } catch (_) { img.dispatchEvent(new Event('error')); }
+        });
+      }
       img.src = imageUrl(entry.src);
       card.append(img);
       if (entry.caption) { const cap = doc.createElement('div'); cap.className = 'meme-cap'; cap.textContent = entry.caption; cap.style.setProperty('--n', String(Math.max(5, entry.caption.length))); card.append(cap); }
@@ -171,10 +182,10 @@ export function createMemeOverlay({ layer, live, byGesture, reduced = false, lim
     layer.append(card);
     // force a frame between insertion and the class so the transition runs
     card.getBoundingClientRect();
-    card.classList.add('in');
+    card.classList.add('show');
     if (live) live.textContent = pick.entry.caption ? `Meme: ${pick.entry.caption}` : 'Meme';
     if (pick.entry.sound === 'boom' && audio && audio.playBoom) { try { audio.playBoom(); } catch (_) { /* sound is optional */ } }
-    timers.push(setT(() => { card.classList.add('out'); }, timing.stayMs));
+    timers.push(setT(() => { card.classList.add('leaving'); }, timing.stayMs));
     timers.push(setT(() => { if (current === card) { card.remove(); current = null; } if (live) live.textContent = ''; }, timing.stayMs + timing.fadeMs));
     shown += 1;
     if (onShow) onShow({ gesture, caption: pick.entry.caption, type: pick.entry.type });

@@ -27,16 +27,36 @@
         <option value="2" selected>MAXIMUM</option>
       </select>
     </div>
+    <div class="cam-box" id="cam-box" hidden role="group" aria-label="Camera preview">
+      <div class="cam-view" id="cam-view">
+        <video id="cam-video" playsinline muted></video>
+        <canvas id="cam-overlay" width="320" height="240" aria-hidden="true"></canvas>
+        <span class="cam-on" id="cam-on"><i></i>CAMERA ON</span>
+        <span class="cam-mockbadge" id="cam-mockbadge" hidden>MOCK CAMERA</span>
+      </div>
+      <div class="cam-line"><span id="cam-fps">0 fps</span><span id="cam-mode" class="cam-mode"></span><button type="button" class="mini cam-stop" id="cam-stop">Stop</button></div>
+      <div class="cam-last" id="cam-last">Gesture: none yet</div>
+      <ol class="cam-timeline" id="cam-timeline" hidden aria-label="Mock camera timeline"></ol>
+      <div class="cam-note">Runs in this browser. Nothing is uploaded or saved.</div>
+    </div>
+    <div class="meme-layer" id="meme-layer"><span class="sr-only" id="meme-live" role="status" aria-live="polite"></span></div>
   </div>
   <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
 
   <section class="panel you" aria-labelledby="you-title">
     <h2 id="you-title">You</h2>
     <p class="hint">Choose what input you use: text or STT</p>
-    <div class="seg" role="tablist" aria-label="Input mode">
-      <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">Text</button>
-      <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">Voice</button>
+    <div class="mode-row">
+      <div class="seg" role="tablist" aria-label="Input mode">
+        <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">Text</button>
+        <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">Voice</button>
+      </div>
+      <button type="button" class="cam-toggle" id="cam-toggle" aria-pressed="false" title="Open the camera for gestures and funny memes. Runs locally; off by default.">
+        <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M17 10.5V7a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-3.5l4 4v-11z"/></svg>
+        <span id="cam-toggle-label">Camera</span>
+      </button>
     </div>
+    <p class="cam-status" id="cam-status" role="status" aria-live="polite" hidden></p>
 
     <div id="pane-text" role="tabpanel" aria-labelledby="tab-text">
       <label class="sr-only" for="q">Your question</label>
@@ -68,6 +88,20 @@
         </span>
       </div>
     </div>
+
+    <details class="cam-actions" id="cam-actions">
+      <summary>Camera actions</summary>
+      <div class="cam-actions-body">
+        <div class="cam-opt">
+          <label for="cam-sens">Sensitivity</label>
+          <select id="cam-sens"><option value="low">Low (fewer false triggers)</option><option value="normal" selected>Normal</option><option value="high">High (easier to trigger)</option></select>
+        </div>
+        <label class="check cam-ask"><input type="checkbox" id="cam-ask"> Let gestures ask questions (costs money)</label>
+        <p class="cam-hint" id="cam-ask-hint">Every fresh question costs about $0.007. Needs the gesture held 0.8 s, at most one question per 10 s. Off by default.</p>
+        <div class="cam-rows" id="cam-rows" role="list"></div>
+        <p class="cam-hint">Memes flash at most about once a second. Test buttons run the action without the camera (a question is never sent from Test).</p>
+      </div>
+    </details>
   </section>
 
   <section class="panel out" id="out" aria-labelledby="out-title">

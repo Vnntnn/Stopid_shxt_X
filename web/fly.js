@@ -3,6 +3,10 @@ import { createScene } from '/static/fly-scene.js';
 import { createFlyAudio } from '/static/fly-audio.js';
 import { flySpeech } from '/static/fly-speak.js';
 import { tokenizeJson, sessionExport, exportFileName, byteSize, formatBytes, makeEventRecord, collapseState, toggleCollapsed, collapseAll, expandAll, allCollapsed, LARGE_BYTES } from '/static/fly-json.js';
+import * as THREE from 'three';
+import { createCamera } from '/static/fly-cam.js';
+import { createGestureEngine, GESTURES, GESTURE_TITLES, SENSITIVITIES, ACTION_TYPES, ACTION_LABELS, defaultActionsConfig, normalizeActionsConfig, planAction, requiredHolds, ASK_COOLDOWN_MS } from '/static/fly-gestures.js';
+import { createMemeOverlay, parseManifest, FALLBACK_MANIFEST } from '/static/fly-memes.js';
 import { hostnameOf, formatCost, formatPct, formatSeconds, clampText, safeHttpUrl, deriveChecks } from '/static/fly-format.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,9 +15,11 @@ const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const COLORS = { A: 'var(--a)', B: 'var(--b)', none: 'var(--none)' };
 const STAGE_LABEL = { interpret: 'Interpret question', research: 'Research sources', pool: 'Build candidates', jev: 'Jev (2 runs)', adapter: 'Verify decision' };
 
-if (params.has('mock')) {
-  const { installMock } = await import('/static/fly-mock.js');
-  installMock(params);
+const camMock = params.get('cam') === 'mock';
+let mockMod = null;
+if (params.has('mock') || camMock) {
+  mockMod = await import('/static/fly-mock.js');
+  if (params.has('mock')) mockMod.installMock(params);
 }
 
 // ---- Scene ----
@@ -1023,3 +1029,218 @@ function browserSpeechFallback(reason) {
 }
 
 addEventListener('pagehide', () => { if (rec.active) stopRecording(true); });
+
+
+// =====================================================================================================
+// Camera: gestures, memes and the fly's reactions. Everything is local; the camera is off until the button is pressed.
+// =====================================================================================================
+
+// ---- Fly rig: follow + reactions, layered on top of the scene without touching fly-scene.js ----
+// The scene recomputes the fly's position every frame before it renders, so offsets added here never accumulate.
+const rig = { fly: null, wings: [], follow: 0, cur: { x: 0, y: 0 }, target: { x: 0, y: 0, on: false, at: 0 }, rx: null, last: performance.now() };
+const smooth01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
+function findFly(sc) {
+  let best = null;
+  for (const o of sc.children) if (o.isGroup && (!best || o.children.length > best.children.length)) best = o;
+  if (!best || best.children.length < 15) return null;
+  rig.wings = best.children.filter((c) => c.isGroup && c.children.length === 1 && c.children[0].isMesh && Math.abs(Math.abs(c.position.x) - 0.3) < 1e-3 && Math.abs(c.position.y - 0.4) < 1e-3);
+  return best;
+}
+const REACTIONS = { startled: 1.3, spin: 1.0, happy: 1.5, lean_left: 1.6, lean_right: 1.6 };
+function rigFrame(sc, cam) {
+  const now = performance.now();
+  const dt = Math.min(0.05, (now - rig.last) / 1000);
+  rig.last = now;
+  if (!rig.fly || !rig.fly.parent) rig.fly = findFly(sc);
+  const f = rig.fly;
+  if (!f) return;
+  const st = scene.state;
+  const busy = st === 'deciding' || st === 'landing';        // never fight the decision flight, landed or not
+  if (busy) rig.rx = null;
+  if (now - rig.target.at > 900) rig.target.on = false;      // attention goes stale when the camera stops sending
+  const want = !busy && st === 'idle' && rig.target.on ? 1 : 0;
+  rig.follow += (want - rig.follow) * Math.min(1, dt * (want ? 5 : 8)); // ramps to 0 quickly but smoothly when a run starts
+  const k = Math.min(1, dt * 5);
+  const tx = rig.target.on ? rig.target.x : 0, ty = rig.target.on ? rig.target.y : 0;
+  rig.cur.x += (tx - rig.cur.x) * k; rig.cur.y += (ty - rig.cur.y) * k;
+  let dx = rig.cur.x * 1.9 * rig.follow, dy = -rig.cur.y * 0.8 * rig.follow, yaw = -rig.cur.x * 0.5 * rig.follow, spin = 0, flap = 0;
+  if (rig.rx) {
+    const r = rig.rx; r.t += dt;
+    const p = r.t / r.dur;
+    if (p >= 1) rig.rx = null;
+    else if (r.name === 'startled') { const env = r.t < 0.12 ? r.t / 0.12 : Math.exp(-(r.t - 0.12) * 3.2); dx += r.dir * 1.7 * env; dy += 0.55 * env; flap = env; }
+    else if (r.name === 'spin') { spin = Math.PI * 2 * smooth01(p); dy += Math.sin(p * Math.PI) * 0.35; flap = 0.5; }
+    else if (r.name === 'happy') { const env = Math.sin(p * Math.PI); dy += Math.abs(Math.sin(r.t * 9)) * 0.45 * env; flap = 0.7 * env; }
+    else if (r.name === 'lean_left' || r.name === 'lean_right') { const env = Math.sin(p * Math.PI); dx += (r.name === 'lean_left' ? -1 : 1) * 1.6 * Math.min(1, env * 1.6); yaw += (r.name === 'lean_left' ? -1 : 1) * 0.4 * env; }
+  }
+  f.position.x += dx; f.position.y += dy;
+  f.rotation.y += yaw + spin;
+  if (flap > 0.05) { const w = Math.sin(now / 1000 * 46 * Math.PI) * 0.85 * flap; if (rig.wings[0]) rig.wings[0].rotation.z += w; if (rig.wings[1]) rig.wings[1].rotation.z -= w; }
+  if (cam && rig.follow > 0.001) cam.position.x -= rig.cur.x * 0.45 * rig.follow; // parallax: the view shifts a little against the fly
+}
+if (!THREE.WebGLRenderer.prototype.__flyRig) {
+  const orig = THREE.WebGLRenderer.prototype.render;
+  THREE.WebGLRenderer.prototype.render = function patchedRender(sc, cam) { try { rigFrame(sc, cam); } catch (_) { /* decoration only */ } return orig.call(this, sc, cam); };
+  THREE.WebGLRenderer.prototype.__flyRig = true;
+}
+const flyApi = {
+  // Returns true when the reaction was accepted. Ignored (not queued) while the fly is deciding or landing.
+  react(name) {
+    if (!(name in REACTIONS) || !scene.ok) return false;
+    const st = scene.state;
+    if (st === 'deciding' || st === 'landing') return false;
+    rig.rx = { name, t: 0, dur: REACTIONS[name], dir: Math.random() < 0.5 ? -1 : 1 };
+    return true;
+  },
+  // x, y in -1..1 on the (mirrored) screen; null releases. Only used while idle.
+  setAttention(x, y) {
+    if (x == null || y == null) { rig.target.on = false; return; }
+    rig.target.x = Math.max(-1, Math.min(1, x)); rig.target.y = Math.max(-1, Math.min(1, y)); rig.target.on = true; rig.target.at = performance.now();
+  },
+};
+window.flyApi = flyApi;
+
+// ---- Settings (localStorage, always in try/catch) ----
+const CAM_KEY = 'fly.cam';
+let camCfg = defaultActionsConfig();
+try { camCfg = normalizeActionsConfig(JSON.parse(localStorage.getItem(CAM_KEY) || 'null')); } catch (_) { /* defaults */ }
+function saveCamCfg() { try { localStorage.setItem(CAM_KEY, JSON.stringify(camCfg)); } catch (_) { /* ignore */ } }
+const PRESETS = ['ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?', "Who is ahead in the latest polls: the People's Party or Bhumjaithai?", 'ใครจะได้เป็นนายกรัฐมนตรีคนต่อไป?'];
+
+// ---- Memes ----
+let memeManifest = FALLBACK_MANIFEST;
+const memes = createMemeOverlay({ layer: $('meme-layer'), live: $('meme-live'), byGesture: memeManifest, reduced, audio: engine });
+(async () => {
+  try {
+    const res = await fetch('/static/memes/memes.json', { cache: 'no-cache' });
+    if (!res.ok) throw new Error(String(res.status));
+    const parsed = parseManifest(await res.json());
+    if (parsed.count > 0) { memeManifest = parsed.byGesture; memes.setManifest(memeManifest); }
+    if (parsed.errors.length) console.warn('memes.json:', parsed.errors.join('; '));
+  } catch (_) { /* built-in fallback cards are used */ }
+})();
+
+// ---- Gesture -> action ----
+const camEngine = createGestureEngine({ sensitivity: camCfg.sensitivity });
+camEngine.setExtraHold(requiredHolds(camCfg));
+let lastAskTs = NaN;
+let camLastInfo = null;
+const camStatus = (text, bad) => { const n = $('cam-status'); n.textContent = text || ''; n.hidden = !text; n.classList.toggle('bad', !!bad); };
+function setCamLast(ev, plan, extra) {
+  const bits = [];
+  if (plan.meme) bits.push('meme');
+  if (plan.action !== 'none') bits.push(plan.action === 'fly' ? `fly ${plan.reaction || ''}`.trim() : plan.action);
+  if (plan.blocked) bits.push(`(${plan.blocked})`);
+  if (extra) bits.push(extra);
+  $('cam-last').textContent = `${GESTURE_TITLES[ev.name] || ev.name} ${Math.round((ev.confidence || 0) * 100)}%${bits.length ? ' → ' + bits.join(' + ') : ''}`;
+  camLastInfo = { name: ev.name, confidence: ev.confidence, ts: ev.ts, test: !!ev.test };
+}
+function onGesture(ev, test = false) {
+  const plan = planAction(camCfg, ev, { lastAskTs, test });
+  if (plan.ignored) return;
+  let extra = '';
+  if (plan.meme) { const r = memes.show(ev.name); if (!r.shown) extra = `no meme: ${r.reason}`; }
+  switch (plan.action) {
+    case 'fly': if (!flyApi.react(plan.reaction)) extra = extra || 'fly is busy'; break;
+    case 'replay': if (voice) $('replay-voice').click(); else extra = extra || 'nothing to replay yet'; break;
+    case 'mute': $('mute').click(); break;
+    case 'preset1': case 'preset2': case 'preset3': {
+      const n = Number(plan.action.slice(-1)) - 1;
+      setMode('text'); $('q').value = PRESETS[n]; extra = extra || `preset ${n + 1} loaded, press Send`;
+      break;
+    }
+    case 'ask': {
+      const text = ($('q').value || $('q').placeholder || '').trim();
+      if (plan.dryRun) { extra = `dry run: would send "${text.slice(0, 40)}"`; break; }
+      if ($('send').disabled || !text) { extra = 'busy or empty, not sent'; break; }
+      lastAskTs = ev.ts; ask(text); extra = 'question sent';
+      break;
+    }
+    default: break;
+  }
+  setCamLast(ev, plan, extra);
+}
+
+// ---- Camera controller ----
+const camUi = { items: [] };
+const cam = createCamera({
+  video: $('cam-video'), overlay: $('cam-overlay'), engine: camEngine,
+  mock: camMock ? mockMod : null,
+  onEvent: (ev) => onGesture(ev),
+  onAttention: (a) => { if (a) flyApi.setAttention(a.x, a.y); else flyApi.setAttention(null); },
+  onFrame: (st) => { $('cam-fps').textContent = `${st.fps} fps`; },
+  onMockTick: (f) => {
+    const name = f.item.name;
+    if (camUi.now !== name) {
+      camUi.now = name;
+      let before = true;
+      for (const li of camUi.items) { li.classList.toggle('now', li.dataset.g === name); if (li.dataset.g === name) before = false; li.classList.toggle('done', before); }
+    }
+  },
+  onState: (s, msg, st) => {
+    const on = s === 'on';
+    $('cam-toggle').setAttribute('aria-pressed', String(on || s === 'starting'));
+    $('cam-toggle-label').textContent = on || s === 'starting' ? 'Camera on' : 'Camera';
+    $('cam-box').hidden = !(on || s === 'starting');
+    $('cam-mockbadge').hidden = !camMock;
+    $('cam-timeline').hidden = !camMock;
+    $('cam-mode').textContent = st.mode === 'full' ? `pose + hands (${st.delegate || ''})` : st.mode === 'motion-only' ? 'motion only' : st.mode === 'mock' ? 'scripted' : '';
+    camStatus(msg, s === 'error');
+    if (!on) { $('cam-fps').textContent = '0 fps'; flyApi.setAttention(null); memes.clear(); }
+  },
+});
+$('cam-toggle').addEventListener('click', () => {
+  engine.unlock();
+  if (cam.running || cam.starting) cam.stop('Camera off.'); else cam.start();
+});
+$('cam-stop').addEventListener('click', () => cam.stop('Camera off.'));
+document.addEventListener('visibilitychange', () => { if (document.hidden && (cam.running || cam.starting)) cam.stop('Camera stopped because the tab was hidden.'); });
+addEventListener('pagehide', () => cam.stop(null, true));
+if (camMock) {
+  $('cam-timeline').hidden = false;
+  for (const g of mockMod.MOCK_ORDER) { const li = el('li', '', GESTURE_TITLES[g] || g); li.dataset.g = g; camUi.items.push(li); $('cam-timeline').append(li); }
+}
+
+// ---- "Camera actions" panel ----
+function applyCamCfg(persist = true) {
+  camCfg = normalizeActionsConfig(camCfg);
+  camEngine.setSensitivity(camCfg.sensitivity);
+  camEngine.setExtraHold(requiredHolds(camCfg));
+  const anyAsk = GESTURES.some((g) => camCfg.rows[g].action === 'ask');
+  $('cam-ask-hint').classList.toggle('warn', anyAsk && !camCfg.askEnabled);
+  if (persist) saveCamCfg();
+}
+const INSTANT = ['wave', 'jump', 'clap']; // no hold time: they can never ask a question
+function buildRows() {
+  const box = $('cam-rows');
+  box.textContent = '';
+  for (const g of GESTURES) {
+    const row = el('div', 'cam-row'); row.setAttribute('role', 'listitem'); row.dataset.g = g;
+    row.append(el('span', 'gname', GESTURE_TITLES[g] || g));
+    const lab = el('label'); const cb = el('input'); cb.type = 'checkbox'; cb.checked = camCfg.rows[g].meme; cb.setAttribute('aria-label', `Show a meme for ${GESTURE_TITLES[g]}`);
+    cb.addEventListener('change', () => { camCfg.rows[g].meme = cb.checked; applyCamCfg(); });
+    lab.append(cb, document.createTextNode('Meme')); row.append(lab);
+    const sel = el('select'); sel.setAttribute('aria-label', `Action for ${GESTURE_TITLES[g]}`);
+    for (const a of ACTION_TYPES) { const o = el('option', '', ACTION_LABELS[a]); o.value = a; if (a === 'ask' && INSTANT.includes(g)) o.disabled = true; sel.append(o); }
+    sel.value = camCfg.rows[g].action;
+    sel.addEventListener('change', () => { camCfg.rows[g].action = sel.value; applyCamCfg(); });
+    row.append(sel);
+    const t = el('button', 'mini', 'Test'); t.type = 'button'; t.setAttribute('aria-label', `Test ${GESTURE_TITLES[g]}`);
+    t.addEventListener('click', () => { engine.unlock(); onGesture({ name: g, confidence: 1, ts: performance.now(), test: true }, true); });
+    row.append(t);
+    box.append(row);
+  }
+}
+buildRows();
+$('cam-sens').value = camCfg.sensitivity;
+$('cam-sens').addEventListener('change', () => { camCfg.sensitivity = $('cam-sens').value; applyCamCfg(); });
+$('cam-ask').checked = camCfg.askEnabled;
+$('cam-ask').addEventListener('change', () => { camCfg.askEnabled = $('cam-ask').checked; applyCamCfg(); });
+applyCamCfg(false);
+
+// ---- Debug / verification hooks (only with ?cam=mock, ?mock or ?debug=1) ----
+if (camMock || params.has('mock') || params.get('debug') === '1') {
+  window.__flyCamDebug = () => ({ running: cam.running, fps: cam.state.fps, lastGesture: camLastInfo, memesShown: memes.shown, mode: cam.state.mode, message: cam.state.message, frames: cam.state.frames, delegate: cam.state.delegate || null, initMs: cam.state.initMs || null });
+  window.__flyApi = flyApi;
+  if (camMock) window.__flyCamMock = { play: (n) => cam.mockPlay(n), names: mockMod.MOCK_ORDER.slice(), test: (n) => onGesture({ name: n, confidence: 1, ts: performance.now(), test: true }, true) };
+}

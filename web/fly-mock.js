@@ -168,7 +168,7 @@ export function installMock(params) {
   const md = navigator.mediaDevices || (navigator.mediaDevices = {});
   const realGum = md.getUserMedia ? md.getUserMedia.bind(md) : null;
   md.getUserMedia = async (c) => {
-    if (realGum && params.get('realmic') === '1') return realGum(c);
+    if (realGum && (params.get('realmic') === '1' || (c && c.video))) return realGum(c); // the synthetic stream is audio only
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();

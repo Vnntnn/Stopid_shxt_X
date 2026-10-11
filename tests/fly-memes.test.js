@@ -171,14 +171,14 @@ test('overlay: one meme at a time, caption in the live region, fades out and is 
     assert.equal(r.shown, true); assert.equal(r.caption, 'NICE');
     assert.equal(d.layer.children.length, 1);
     const card = d.layer.children[0];
-    assert.ok(card.classes.has('in')); assert.equal(card.classes.has('static'), reduced);
+    assert.ok(card.classes.has('show')); assert.equal(card.classes.has('static'), reduced);
     assert.match(d.live.textContent, /NICE/);
     assert.equal(booms.length, 1);
     const cap = card.children.find((c) => c.classes.has('meme-cap')); assert.equal(cap.textContent, 'NICE');
     // a second request right away is refused (cooldown) and nothing else appears
     assert.equal(ov.show('wave').shown, false); assert.equal(d.layer.children.length, 1);
-    advance(899); assert.ok(!card.classes.has('out'));
-    advance(1); assert.ok(card.classes.has('out'));
+    advance(899); assert.ok(!card.classes.has('leaving'));
+    advance(1); assert.ok(card.classes.has('leaving'));
     advance(250); assert.equal(d.layer.children.length, 0); assert.equal(d.live.textContent, '');
     advance(100);
     assert.equal(ov.show('wave').shown, true); assert.equal(d.layer.children.length, 1);
