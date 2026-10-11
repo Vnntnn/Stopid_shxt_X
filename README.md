@@ -12,6 +12,14 @@ Already installed on this machine:
 
 Open **http://127.0.0.1:8765**. The model loads once at startup; the UI shows readiness. Stop with Ctrl+C. To use another port: `PORT=8766 ./run.sh`. Default inference uses CPU and four PyTorch threads. `ONFLY_THREADS=2 ./run.sh` changes the thread count.
 
+The Fly Ask page is served at `/`; old `/fly` links redirect to `/` with their query parameters preserved. Use `/?mock=1` to preview with mock responses. `./run-fly.sh` starts the same page on port 8766. The earlier decision and election-project UI described below remains available at `/static/index.html`.
+
+Fly Ask supports choices across topics: give two alternatives and a goal or constraint, such as “walk or drive to a nearby shop while minimizing fuel cost.” DeepSeek interprets the question into `options` A/B, a criterion, and short facts; the local Jev model makes the choice using two swapped runs. Open-ended questions generate two suggested alternatives, and comparisons with more than two alternatives explicitly identify the pair being compared. The third result is “No clear choice” when neither option is supported. Old political-prompt cache entries are ignored. Open `/` without `?mock` for actual questions; mock mode shows a labeled, fixed tea/coffee example.
+
+Each option has an English `name` for Jev and a `label` in the question's language for display. Thai questions show Thai labels on the landing flowers, result bars, answer and speech, while preserving option IDs and probabilities. Both names are produced in the same DeepSeek call. Cache version 3 ignores older results without localized labels.
+
+The 3D character uses [Housefly by Schmoldt5000 / schmoldt.art](https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd), licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/). The local `web/models/housefly/` asset includes the original body, hair, and wing textures (about 6.8 MB total). Its display pedestal is removed, and authored pivots animate wings, six legs, and head with the app's listening, thinking, and landing states. Attribution is visible on the page; source credits, license, and checksums live beside the model. To rebuild from the downloaded glTF folder: `.venv/bin/python scripts/import_housefly.py /path/to/housefly`. The page keeps a procedural fly as a loading/error fallback.
+
 For a fresh checkout, use Python 3.11 or newer:
 
 ```sh

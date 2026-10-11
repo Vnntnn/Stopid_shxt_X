@@ -1,0 +1,15 @@
+NeuroMechFly body geometry and rigging from NeLy-EPFL/flygym.
+Source: https://github.com/NeLy-EPFL/flygym
+Pinned revision: 38c8ec61034cd59bc5ba0de20688d4a3c0000d60
+License: Apache License, Version 2.0 (see LICENSE).
+
+NeuroMechFly v2: Wang-Chen et al. (2024), Nature Methods.
+https://doi.org/10.1038/s41592-024-02497-y
+Original scan-derived body: Lobato-Rios et al. (2022), Nature Methods.
+https://doi.org/10.1038/s41592-022-01466-7
+
+Modified for Fly Ask: simplified STL meshes converted to an indexed GLB,
+left-side meshes mirrored for the right side, neutral leg pose applied,
+coordinate axes converted for Three.js, and web materials assigned.
+Flight, wing folding, leg tucking, antenna/head motion, and landing are
+application-authored animations, not MuJoCo physics or recorded kinematics.

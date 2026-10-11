@@ -1,16 +1,25 @@
 # Fly Ask: text/voice question -> LLM -> RAG -> candidate pool -> On-Fly-Jev -> verified decision
 
 Hackathon feature on top of the existing Fly Decision Lab (`app.py`, `project_store.py`, `scrapers.py`, `web/`).
-Demo question (Thai, neutral wording): "ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?"
+Example question: "ระหว่างชากับกาแฟ ถ้าอยากลดคาเฟอีนควรเลือกอะไร?"
 
 
 > **REVISION (OpenRouter only, one LLM call) - supersedes the pipeline/config text below where they differ.**
 > - Gemini is removed. `LLM_PROVIDER` is `openrouter` (default) or `fake`. Default model `deepseek/deepseek-v4.1-flash`
 >   (`OPENROUTER_MODEL` overrides; reasoning disabled, temperature 0, `max_tokens` capped).
+> - The current prompt handles choices in any domain, preserving the user's alternatives, goals and constraints.
+>   Interpreter JSON uses `options: [{id: "A", name, label, aliases}, {id: "B", name, label, aliases}]`; legacy `parties` input
+>   is accepted and normalized to `options`. Open-ended questions propose two alternatives; more-than-two
+>   comparisons explicitly state the selected pair in `echo`. User constraints are included in the findings.
+>   `name` stays English for Jev; `label` follows the user's language (Thai for Thai questions) and appears on
+>   flowers, result bars, the answer and speech. Both are generated in the same call, preserving IDs and weights.
 > - ONE OpenRouter call with the web plugin (`max_results: 2`) does interpret + search + 2-3 short facts. If that call
 >   fails (402/429/5xx/timeout) it is retried once without web (`research.grounded=false`).
 > - The candidate pool is built in CODE: `state` = one short text `Findings: ...` (<= ~400 chars), candidates `A`/`B` =
->   short party names, `none` = "No clear leader", question "Which candidate <criterion>?". Jev runs twice (A/B swapped).
+>   short option names, `none` = "No clear choice", question "Which candidate <criterion>?". Jev runs twice (A/B swapped).
+> - Result and speech templates describe a choice, not a political lead. Cache entries carry a prompt version;
+>   version 3 ignores earlier political prompts and results without localized labels. `?mock=1` remains a fixed tea/coffee preview
+>   with a visible mock notice and a link to the real app.
 > - Stage events keep the five names for the UI: `interpret` (the one call), `research` (ms 0, `merged_with: interpret`),
 >   `pool` (code), `jev`, `adapter`. Measured live: ~5-6 s end to end, ~$0.007 per fresh question, ~2.6k prompt tokens.
 > - Jev stays the real decision maker. Search results change between runs, so a fresh run can differ (even be
@@ -23,7 +32,7 @@ support?" with candidates `A`, `B` and `none` ("sources show no clear leader"). 
 evidence: do not add more disclaimers than that.
 
 ## Screen (user's sketch)
-Dark full-screen page `/fly`. Centre: big 3D fly. Top right box "You": toggle Text | Voice (STT), input, send.
+Dark full-screen page `/`. Centre: big 3D fly. Top right box "You": toggle Text | Voice (STT), input, send.
 Bottom left box "Output fly": stage progress, the answer, probability bars, sources, the disclaimer line.
 Fly states: `idle` (hover), `listening` (fast wings while recording), `thinking` (circles while the pipeline runs),
 `deciding` -> flies to the winning candidate's pad (A left, B right, none centre-back) and lands,
@@ -69,7 +78,7 @@ FINAL:
 -> `{"text": "..."}`. Server forwards to Paxa Labs `POST https://api.paxalabs.com/v1/audio/transcriptions`
 (multipart: `file`, `model=paxa-stt-lite-v1-preview`, `language=th`, `response_format=json`;
 header `Authorization: Bearer $PAXA_API_KEY`; response `{"text": "..."}`). The key never reaches the browser.
-`GET /fly` serves `web/fly.html`. `GET /api/ask/health` -> which providers/keys are configured (booleans only).
+`GET /` serves `web/fly.html`. `GET /fly` redirects permanently to `/`, preserving query parameters. `GET /api/ask/health` -> which providers/keys are configured (booleans only).
 
 ## Config (`.env`, git-ignored; `.env.example` is committed)
 `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-flash-latest`; `gemini-2.5-flash` is closed to new accounts, configurable because model names change),

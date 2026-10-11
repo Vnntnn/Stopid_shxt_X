@@ -1,0 +1,11 @@
+Model Information:
+* title:	Housefly
+* source:	https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd
+* author:	schmoldt.art (https://sketchfab.com/schmoldt.art)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Housefly" (https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd) by schmoldt.art (https://sketchfab.com/schmoldt.art) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -21,37 +21,56 @@ log = logging.getLogger("onfly.ask")
 ROOT = Path(__file__).resolve().parent
 CACHE_PATH = ROOT / ".runtime" / "ask_cache.json"
 DISCLAIMER = "Entertainment demo - not a prediction"
-NONE_LABEL = "No clear leader"
+NONE_LABEL = "No clear choice"
+CACHE_VERSION = 3
 STATE_MAX_CHARS = 400
 MAX_FACTS, MAX_FACT_WORDS, MAX_CRITERION_WORDS = 3, 22, 12
 STAGES = ("interpret", "research", "pool", "jev", "adapter")
 
 # ---------------------------------------------------------------------------------------------- prompt
 ASK_SYSTEM = (
-    "Neutral analyst. The user asks which of two parties/people leads. Resolve nicknames to the CURRENT party names (use today's date); if a party was dissolved or renamed, use its successor's current name and prefer the most recent findings. "
+    "You are a neutral decision assistant for choices in any domain: everyday activities, food, products, "
+    "travel, work, technology, people, or politics. Interpret the user's actual question as a choice between "
+    "two distinct alternatives A and B. Preserve explicitly supplied alternatives and their order; never "
+    "replace them with unrelated people or political parties. If the question is open-ended, propose two "
+    "relevant practical alternatives and state them clearly in echo. If more than two are supplied, explicitly "
+    "state in echo which two are being compared. Use the user's goal, preferences, budget and constraints "
+    "as the decision criterion; do not invent missing preferences or assume that 'winning' or polls are the goal. "
+    "Resolve ambiguous names in context, using current names only when relevant. "
     "Search once. Reply with compact JSON only: "
     '{"echo":"one sentence in the user\'s language starting with the translation of \'I understood:\'",'
-    '"language":"th|en","parties":[{"id":"A","name":"short English name, max 4 words","aliases":[]},{"id":"B",...}],'
+    '"language":"th|en","options":[{"id":"A","name":"short English name, max 4 words",'
+    '"label":"short display name in the user\'s language","aliases":[]},'
+    '{"id":"B","name":"short English name, max 4 words",'
+    '"label":"short display name in the user\'s language","aliases":[]}],'
     '"criterion":"verb phrase of max 12 words that completes the sentence \'Which candidate ...?\', '
-    'e.g. is ahead in the latest polls","facts":[{"text":"max 22 English words"}],"as_of":"date or period"}. '
-    "facts: 2-3 short findings from the search that bear on the criterion, equal coverage of both parties, "
-    "no speculation, no numbers you did not read. No URLs. Every field except echo MUST be English (translate).")
+    'e.g. best fits the low-cost commute or contains less caffeine",'
+    '"facts":[{"text":"max 22 English words"}],"as_of":"date or period"}. '
+    "facts: 2-3 short relevant facts covering both alternatives fairly. Include user-provided constraints "
+    "as a fact prefixed 'User:'. Distinguish user statements from searched findings. State missing evidence "
+    "or an unclear goal rather than inventing certainty. No speculation, no fabricated prices, statistics "
+    "or sources. No URLs. The downstream model may choose neither alternative when the evidence is "
+    "insufficient or neither fits. Do not decide the winner yourself. Names, criterion and facts MUST be "
+    "English for the decision model. Echo and option labels MUST use the user's language: if language is th, "
+    "translate each display label into natural Thai (e.g. Walk to store -> เดินไปร้านค้า, Desktop PC -> คอมตั้งโต๊ะ). "
+    "Keep brand names and proper nouns when appropriate. Labels must describe exactly the same option as "
+    "name and preserve the user's wording where possible. Aliases may keep the original language.")
 
 # ---------------------------------------------------------------------------------------------- templates
 TEXT = {
     "th": {
-        "none_label": "ไม่มีผู้นำที่ชัดเจน",
-        "A": "แหล่งข้อมูลที่ค้นพบสนับสนุนว่า {label} นำอยู่ (น้ำหนัก {pct}%)",
-        "B": "แหล่งข้อมูลที่ค้นพบสนับสนุนว่า {label} นำอยู่ (น้ำหนัก {pct}%)",
-        "none": "แหล่งข้อมูลที่ค้นพบไม่ชี้ชัดว่าฝ่ายใดนำ (น้ำหนัก {pct}%)",
+        "none_label": "ยังเลือกไม่ได้",
+        "A": "จากข้อมูลและเงื่อนไขที่ให้มา แมลงวันเลือก {label} (น้ำหนัก {pct}%)",
+        "B": "จากข้อมูลและเงื่อนไขที่ให้มา แมลงวันเลือก {label} (น้ำหนัก {pct}%)",
+        "none": "ข้อมูลและเงื่อนไขยังไม่สนับสนุนตัวเลือกใดอย่างชัดเจน (น้ำหนัก {pct}%)",
         "disagree": "ยังสรุปไม่ได้: การตรวจสองลำดับตัวเลือกให้คำตอบไม่ตรงกัน",
         "ungrounded": " (ไม่มีข้อมูลค้นเว็บสด)",
         "low": "ยังสรุปไม่ได้: ความมั่นใจต่ำกว่าเกณฑ์ ({pct}%)"},
     "en": {
-        "none_label": "No clear leader",
-        "A": "The sources found support {label} being ahead (weight {pct}%)",
-        "B": "The sources found support {label} being ahead (weight {pct}%)",
-        "none": "The sources found show no clear leader (weight {pct}%)",
+        "none_label": "No clear choice",
+        "A": "Given the information and constraints, the fly chooses {label} (weight {pct}%)",
+        "B": "Given the information and constraints, the fly chooses {label} (weight {pct}%)",
+        "none": "The information and constraints do not clearly support either option (weight {pct}%)",
         "disagree": "Inconclusive: the two option orders gave different answers",
         "ungrounded": " (no live web data)",
         "low": "Inconclusive: confidence is below the threshold ({pct}%)"}}
@@ -88,7 +107,8 @@ class AskCache:
 
     def get(self, text):
         entry = self._load().get(normalise(text))
-        return entry["final"] if isinstance(entry, dict) and isinstance(entry.get("final"), dict) else None
+        return entry["final"] if (isinstance(entry, dict) and entry.get("version") == CACHE_VERSION
+                                  and isinstance(entry.get("final"), dict)) else None
 
     def size(self):
         return len(self._load())
@@ -97,7 +117,7 @@ class AskCache:
         with self._lock:
             data = self._load()
             data.pop(normalise(text), None)
-            data[normalise(text)] = {"saved_at": time.time(), "final": final}
+            data[normalise(text)] = {"version": CACHE_VERSION, "saved_at": time.time(), "final": final}
             while len(data) > self.MAX:
                 data.pop(next(iter(data)))
             self.path.parent.mkdir(parents=True, exist_ok=True)
@@ -138,26 +158,31 @@ def validate_answer(raw):
     """Strictly validate the single LLM answer. Unknown top-level keys are dropped, over-long facts are truncated."""
     if not isinstance(raw, dict):
         raise Invalid("the answer must be a JSON object")
-    missing = {"echo", "language", "parties", "criterion", "facts", "as_of"} - set(raw)
+    missing = {"echo", "language", "criterion", "facts", "as_of"} - set(raw)
+    if "options" not in raw and "parties" not in raw:
+        missing.add("options")
     if missing:
         raise Invalid(f"missing keys {sorted(missing)}")
     language = _str(raw["language"], "language", 8).lower()
-    parties = raw["parties"]
-    if not isinstance(parties, list) or len(parties) != 2:
-        raise Invalid("parties must be a list of exactly 2 parties")
+    # Accept the old field for compatibility, but all new output uses options.
+    options = raw.get("options", raw.get("parties"))
+    if not isinstance(options, list) or len(options) != 2:
+        raise Invalid("options must be a list of exactly 2 options")
     clean = []
-    for want, party in zip(("A", "B"), parties):
-        if not isinstance(party, dict) or {"id", "name"} - set(party):
-            raise Invalid("each party needs id and name")
-        if party["id"] != want:
-            raise Invalid(f"parties must be ordered with ids A then B (got {party['id']!r} where {want!r} was expected)")
-        aliases = party.get("aliases", [])
+    for want, option in zip(("A", "B"), options):
+        if not isinstance(option, dict) or {"id", "name"} - set(option):
+            raise Invalid("each option needs id and name")
+        if option["id"] != want:
+            raise Invalid(f"options must be ordered with ids A then B (got {option['id']!r} where {want!r} was expected)")
+        aliases = option.get("aliases", [])
         if not isinstance(aliases, list) or not all(isinstance(a, str) for a in aliases):
             raise Invalid("aliases must be a list of strings")
-        name = _english(_str(party["name"], "party name", 60), "party name")
-        clean.append({"id": want, "name": name, "aliases": [a.strip()[:80] for a in aliases[:6]]})
+        name = _english(_str(option["name"], "option name", 60), "option name")
+        # Legacy party responses may lack a label; new option responses must supply it.
+        label = _str(option.get("label", name if "options" not in raw else None), "option label", 80)
+        clean.append({"id": want, "name": name, "label": label, "aliases": [a.strip()[:80] for a in aliases[:6]]})
     if clean[0]["name"].lower() == clean[1]["name"].lower():
-        raise Invalid("the two parties must be different")
+        raise Invalid("the two options must be different")
     facts = raw["facts"]
     if not isinstance(facts, list) or not facts:
         raise Invalid("facts must be a non-empty list")
@@ -172,7 +197,7 @@ def validate_answer(raw):
     criterion = _english(_words(_str(raw["criterion"], "criterion", 300), MAX_CRITERION_WORDS).rstrip(" ?.").strip(), "criterion")
     if not criterion:
         raise Invalid("criterion must not be empty")
-    return {"language": language if language in ("th", "en") else "en", "parties": clean, "criterion": criterion,
+    return {"language": language if language in ("th", "en") else "en", "options": clean, "criterion": criterion,
             "facts": clean_facts, "as_of": _str(raw["as_of"], "as_of", 60, allow_empty=True),
             "echo": _str(raw["echo"], "echo", 500)}
 
@@ -191,7 +216,7 @@ def build_pool(answer, agent):
     Limits are checked with the real tokenizer; the findings are cut (never failed) until the state fits."""
     from decision_core import OPT_MAX_TOKENS, encode, to_internal, tokenize_question, tokenize_state
     tok = agent.tok
-    names = {p["id"]: p["name"] for p in answer["parties"]}
+    names = {p["id"]: p["name"] for p in answer["options"]}
     for key, name in names.items():
         for slot in ("A", "B"):
             while len(encode(tok, "\n- " + f"{slot}: {name}")) > OPT_MAX_TOKENS and " " in name:
@@ -341,7 +366,7 @@ async def stage_interpret(ctx):
     if result["grounded"]:
         sources = [{"title": s["title"], "url": s["url"], "snippet": s.get("snippet", "")} for s in result["sources"][:3]]
     ctx.update(answer=answer, sources=sources, grounded=result["grounded"], research_provider=result["provider"])
-    return {"echo": answer["echo"], "language": answer["language"], "parties": answer["parties"],
+    return {"echo": answer["echo"], "language": answer["language"], "options": answer["options"],
             "criterion": answer["criterion"], "provider": result["provider"], "usage": result["usage"]}
 
 
@@ -399,7 +424,7 @@ async def stage_jev(ctx):
 async def stage_adapter(ctx):
     verdict = adapt(ctx["runs"][0], ctx["runs"][1], min_conf())
     answer = ctx["answer"]
-    labels = {p["id"]: p["name"] for p in answer["parties"]}
+    labels = {p["id"]: p["label"] for p in answer["options"]}
     labels["none"] = TEXT.get(answer["language"], TEXT["en"])["none_label"]
     decision = verdict["decision"]
     ctx["final"] = {

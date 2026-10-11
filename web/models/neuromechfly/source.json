@@ -1,0 +1,9 @@
+{
+  "repository": "https://github.com/NeLy-EPFL/flygym",
+  "revision": "38c8ec61034cd59bc5ba0de20688d4a3c0000d60",
+  "license": "Apache-2.0",
+  "segments": 69,
+  "triangles": 115158,
+  "sha256": "41a0fdb881c6bec9b8b26d65aadb9783a4135324f40f3e015758e852b66ecbc3",
+  "bytes": 2070036
+}

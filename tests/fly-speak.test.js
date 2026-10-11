@@ -12,7 +12,7 @@ const final = (decision, over = {}) => ({
   candidates: [
     { id: 'A', label: "People's Party", prob: 0.634 },
     { id: 'B', label: 'Bhumjaithai Party', prob: 0.251 },
-    { id: 'none', label: 'ไม่มีผู้นำที่ชัดเจน', prob: 0.115 },
+    { id: 'none', label: 'ยังเลือกไม่ได้', prob: 0.115 },
   ],
   interpretation: { language: 'th' },
   consistency: { agree: true },
@@ -45,10 +45,22 @@ test('inconclusive says it cannot decide and names no winner or number', async (
   assert.ok(!/\d/.test(en));
 });
 
-test('none (no clear leader) is spoken as no clear leader with its label', async () => {
+test('Thai choice labels are preserved in speech for either landing target', async () => {
   const { flySpeech } = await load();
-  assert.match(flySpeech(final('none'), 'th', 1), /ไม่มีผู้นำที่ชัดเจน/);
-  assert.match(flySpeech(final('none'), 'en', 1), /no clear leader/i);
+  const candidates = [{ id: 'A', label: 'ชา', prob: 0.7 }, { id: 'B', label: 'กาแฟ', prob: 0.3 }];
+  for (const [id, label] of [['A', 'ชา'], ['B', 'กาแฟ']]) {
+    for (const level of [0, 1, 2]) {
+      const spoken = flySpeech(final(id, { candidates }), 'th', level);
+      assert.ok(spoken.includes(label), spoken);
+      assert.ok(!/Tea|Coffee/.test(spoken), spoken);
+    }
+  }
+});
+
+test('none is spoken as no clear choice with its label', async () => {
+  const { flySpeech } = await load();
+  assert.match(flySpeech(final('none'), 'th', 1), /ยังเลือกไม่ได้/);
+  assert.match(flySpeech(final('none'), 'en', 1), /no clear choice/i);
 });
 
 test('language is taken from interpretation.language when not forced', async () => {

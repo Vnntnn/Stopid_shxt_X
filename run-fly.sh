@@ -1,5 +1,5 @@
 #!/bin/sh
-# Start the Fly Ask app (page at http://127.0.0.1:8766/fly). Uses .venv if present, else the On-Fly-Jev venv.
+# Start the Fly Ask app (page at http://127.0.0.1:8766/). Uses .venv if present, else the On-Fly-Jev venv.
 set -eu
 cd "$(dirname "$0")"
 PY=.venv/bin/python

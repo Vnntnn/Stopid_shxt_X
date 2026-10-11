@@ -7,9 +7,9 @@ forward/swapped details, sources, cache badge, Jev inference ms, disclaimer). At
 under the fly. Everything follows `docs/fly-ask-pipeline.md` (NDJSON `/api/ask`, multipart `/api/stt`).
 
 ## How to open
-- Real backend: `/fly` (the backend serves `web/fly.html`; assets load from `/static/...`).
-- No backend: `/fly?mock=1` (decision A), `/fly?mock=inconclusive` (decision inconclusive),
-  `/fly?mock=1&fail=<interpret|research|pool|jev|adapter>` (stage failure). Mock STT returns a canned Thai transcript
+- Real backend: `/` (the backend serves `web/fly.html`; assets load from `/static/...`; old `/fly` links redirect to `/`).
+- No backend: `/?mock=1` (decision A), `/?mock=inconclusive` (decision inconclusive),
+  `/?mock=1&fail=<interpret|research|pool|jev|adapter>` (stage failure). Mock STT returns a canned Thai transcript
   and, in mock mode only, a synthetic microphone is used so voice can be tried without hardware (`&realmic=1` to use the real one).
 
 ## Files (bytes)

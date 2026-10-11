@@ -1,0 +1,11 @@
+"Housefly" by Schmoldt5000 / schmoldt.art
+https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd
+https://sketchfab.com/schmoldt.art
+Licensed under Creative Commons Attribution 4.0 International.
+https://creativecommons.org/licenses/by/4.0/
+
+Modified for Fly Ask: display pedestal removed, disconnected body/head/wing/leg
+parts grouped into rigid animation pivots, hair cards attached to corresponding
+body parts, geometry normalized, and transparency settings adjusted for WebGL.
+Original textures, UVs, normals, and tangents preserved. Wing flapping, folding,
+leg tucking, head turns, and landing are authored application animations.

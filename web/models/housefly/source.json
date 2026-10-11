@@ -1,0 +1,42 @@
+{
+  "source": "https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd",
+  "author": "schmoldt.art (https://sketchfab.com/schmoldt.art)",
+  "license": "CC-BY-4.0",
+  "triangles": 12187,
+  "pivots": 16,
+  "source_sha256": "a9b0a7f4c3a517d35515da73f912c7feb518d335dd467115d4e339faef4341b8",
+  "files": {
+    "fly.glb": {
+      "bytes": 627772,
+      "sha256": "854ab03dbbadb03a224d88f8029e1141cd5fd2a5f239c319c06a99b082ec86b4"
+    },
+    "LICENSE.txt": {
+      "bytes": 668,
+      "sha256": "141b0e5c58232504bdb7618d462f8b1972a6089073436e4a87507c0c51fccc0a"
+    },
+    "textures/MultiMat_0_baseColor.png": {
+      "bytes": 1171929,
+      "sha256": "a47f9a2279e3d5b025708e20d9c7db57f3ff3d6f86406b084dc415d80109dbb3"
+    },
+    "textures/MultiMat_0_metallicRoughness.png": {
+      "bytes": 602079,
+      "sha256": "2c4ff3ccc1e4dfee5275b4b80a1a3fe44158e4c01245d83bb88966615ade51ca"
+    },
+    "textures/MultiMat_0_normal.png": {
+      "bytes": 1749027,
+      "sha256": "4bd9ebe11782470ed647c75106bec7a32a7d6ae5b1df783a6e54c420f405db0c"
+    },
+    "textures/MultiMat_0h_baseColor.png": {
+      "bytes": 637144,
+      "sha256": "7e1c99f6cbb6126c0071e3d10390500861d3271a00fde26fe70c91d57bcfcd1f"
+    },
+    "textures/MultiMat_0d_baseColor.png": {
+      "bytes": 1461992,
+      "sha256": "201ebd31d42e16fd21eeb8f7b072fdaf9a5eb6175460808a53aa0e4a19fa6e77"
+    },
+    "textures/MultiMat_0d_transmission.png": {
+      "bytes": 505524,
+      "sha256": "486cc99343333a27abd005d84bcf0d36501c7c360c26051e707a362723bd1215"
+    }
+  }
+}

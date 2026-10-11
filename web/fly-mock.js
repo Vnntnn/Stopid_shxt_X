@@ -3,17 +3,13 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const enc = new TextEncoder();
 
 const SOURCES = [
-  { title: '"อนุทิน" มั่นใจเสียงพรรคร่วมรับศึกซักฟอก ยันไม่มีดีลล่วงหน้า "กล้าธรรม" | Thai PBS News ข่าวไทยพีบีเอส', url: 'https://www.thaipbs.or.th/news/content/570727',
-    snippet: '"อนุทิน" มั่นใจเสียงพรรคร่วมรับศึกซักฟอก ยันไม่มีดีลล่วงหน้า "กล้าธรรม" | Thai PBS News ข่าวไทยพีบีเอส ... # "อนุทิน" มั่นใจเสียงพรรคร่วมรับศึกซักฟอก ยันไม่มีดีลล่วงหน้า "กล้าธรรม" ... การเมือง 10 ต.ค. 69 ... "อนุทิน" มั่นใจเสียงพรรคร่วมลุยอภิปรายไม่ไว้วางใจ ฝ่ายค้านขอเวลา 5 วัน ขณะที่วิป 2 ฝ่ายยังหารือกำหนดวันอยู่ ... ' },
-  { title: '"อนุทิน" มั่นใจเสียงรัฐบาล ซัด "สาธุ" หากกล้าธรรมช่วยหนุน แซว "พลพีร์" หนาวสุด มท.2 รอดซักฟอกคนเดียว | สยามรัฐ | LINE TODAY', url: 'https://today.line.me/th/v3/article/GgNM3j8',
-    snippet: '"อนุทิน" มั่นใจเสียงรัฐบาล ซัด "สาธุ" หากกล้าธรรมช่วยหนุน แซว "พลพีร์" หนาวสุด มท.2 รอดซักฟอกคนเดียว | สยามรัฐ | LINE TODAY #### สยามรัฐ' },
-  { title: 'Poll: support for People\'s Party edges up, Bhumjaithai steady (sample)', url: 'https://www.example.com/poll/2026-10?utm_source=mock&very_long_parameter=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-    snippet: 'A new national poll of 2,400 voters puts the People\'s Party at 31% and Bhumjaithai at 29%, within the margin of error.   The survey was fielded over\nfour days and weighted by region, age and education. ... Analysts caution that a large share of respondents remain undecided, and that regional swings differ widely from the national average. Pollsters said the next wave is due in November.' },
+  { title: 'MOCK: ตัวอย่างข้อมูลชาและกาแฟ', url: 'https://example.com/mock-drink-comparison',
+    snippet: 'ข้อมูลสมมติสำหรับทดสอบ UI ไม่ใช่แหล่งอ้างอิงจริง' },
 ];
 const FACTS = [
-  { text: 'Anutin, Bhumjaithai leader and PM, says he is confident in coalition MPs\' support ahead of a censure debate.', source_title: '', source_url: '' },
-  { text: 'Anutin said there is no advance deal with the Klatham Party and joked \'sadhu\' if it backs the government.', source_title: '', source_url: '' },
-  { text: 'The opposition requested five days for the no-confidence debate; timing is still being discussed by whips.', source_title: '', source_url: '' },
+  { text: 'MOCK User: choose a drink with less caffeine.', source_title: '', source_url: '' },
+  { text: 'MOCK: the example tea serving has less caffeine than the example coffee serving.', source_title: '', source_url: '' },
+  { text: 'MOCK: caffeine depends on the drink type, preparation and serving size.', source_title: '', source_url: '' },
 ];
 const MODEL = 'deepseek/deepseek-v4.1-flash';
 const NOTICE = 'Web search was unavailable (HTTP 402), so this answer uses the model\'s own knowledge only.';
@@ -26,15 +22,15 @@ function dataFor(decision, grounded) {
   const dec = A ? 'A' : 'inconclusive';
   const sources = grounded ? SOURCES : [];
   return {
-    interpret: { echo: 'ฉันเข้าใจว่าคุณถามว่า ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู พรรคไหนมีผลโพลนำ', language: 'th',
-      parties: [{ id: 'A', name: "People's Party", aliases: ['พรรคของคุณพิธา', 'พรรคประชาชน', "Pitha's party"] }, { id: 'B', name: 'Bhumjaithai Party', aliases: ['พรรคของเสี่ยหนู', 'พรรคภูมิใจไทย', "Anutin's party"] }],
-      criterion: 'is ahead in the latest polls', provider: MODEL,
+    interpret: { echo: 'ฉันเข้าใจว่า: เปรียบเทียบชาและกาแฟ ว่าอะไรมีคาเฟอีนน้อยกว่า (คำถามตัวอย่าง)', language: 'th',
+      options: [{ id: 'A', name: 'Tea', label: 'ชา', aliases: ['ชา'] }, { id: 'B', name: 'Coffee', label: 'กาแฟ', aliases: ['กาแฟ'] }],
+      criterion: 'contains less caffeine', provider: MODEL,
       usage: { prompt_tokens: 2631, completion_tokens: 217, total_tokens: 2848, cost: 0.00731437 } },
     research: { facts: FACTS, as_of: '2026-10-10', sources, grounded, provider: MODEL, merged_with: 'interpret',
       search: grounded ? { engine: 'exa', max_results: 3, results_returned: sources.length, model: MODEL } : undefined,
       notice: grounded ? undefined : NOTICE },
-    pool: { state: 'Findings: ' + FACTS.map((f) => f.text).join(' '), instructions: 'Which candidate is ahead in the latest polls?',
-      candidates: { A: "People's Party", B: 'Bhumjaithai Party', none: 'No clear leader' }, state_trimmed: !A },
+    pool: { state: 'Findings: ' + FACTS.map((f) => f.text).join(' '), instructions: 'Which candidate contains less caffeine?',
+      candidates: { A: 'Tea', B: 'Coffee', none: 'No clear choice' }, state_trimmed: !A },
     jev: { inference_ms: 805.5, forward: fwd, swapped: swp },
     adapter: { decision: dec, agree: A, mean, reason: A ? 'both runs agree and the mean clears the threshold' : 'forward and swapped runs disagree', min_conf: 0.5,
       forward_choice: A ? 'A' : 'B', swapped_choice: A ? 'A' : 'none', top: A ? 'A' : 'B', top_prob: A ? 0.63 : 0.5061, id_ok: true,
@@ -42,15 +38,15 @@ function dataFor(decision, grounded) {
     final: {
       decision: dec,
       candidates: [
-        { id: 'A', label: "People's Party", claim: "People's Party is ahead in the latest polls", prob: mean.A },
-        { id: 'B', label: 'Bhumjaithai Party', claim: 'Bhumjaithai Party is ahead in the latest polls', prob: mean.B },
-        { id: 'none', label: 'ไม่มีผู้นำที่ชัดเจน', claim: 'No clear leader', prob: mean.none },
+        { id: 'A', label: 'ชา', claim: 'Tea contains less caffeine', prob: mean.A },
+        { id: 'B', label: 'กาแฟ', claim: 'Coffee contains less caffeine', prob: mean.B },
+        { id: 'none', label: 'ยังเลือกไม่ได้', claim: 'No clear choice', prob: mean.none },
       ],
-      interpretation: { echo: 'ฉันเข้าใจว่าคุณถามว่า ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู พรรคไหนมีผลโพลนำ', language: 'th', question_en: 'Which candidate is ahead in the latest polls?' },
+      interpretation: { echo: 'ฉันเข้าใจว่า: เปรียบเทียบชาและกาแฟ ว่าอะไรมีคาเฟอีนน้อยกว่า (คำถามตัวอย่าง)', language: 'th', question_en: 'Which candidate contains less caffeine?' },
       sources,
       consistency: { agree: A, forward: fwd, swapped: swp },
       jev: { inference_ms: 805.5, provider: MODEL },
-      answer_text: A ? 'จากแหล่งข้อมูลที่ค้นพบ แหล่งข้อมูลสนับสนุนว่าพรรคประชาชนมีแนวโน้มนำ (63%)' : 'ยังสรุปไม่ได้: การตรวจสองลำดับตัวเลือกให้คำตอบไม่ตรงกัน',
+      answer_text: A ? 'คำตอบตัวอย่าง: แมลงวันเลือกชา (น้ำหนัก 63%)' : 'ยังสรุปไม่ได้: การตรวจสองลำดับตัวเลือกให้คำตอบไม่ตรงกัน',
       research: { grounded, provider: MODEL },
       disclaimer: 'Entertainment demo - not a prediction', from_cache: false },
   };
@@ -103,6 +99,14 @@ function fakeVoiceWav(text) {
 }
 
 export function installMock(params) {
+  const notice = document.createElement('aside');
+  notice.className = 'mock-notice';
+  notice.setAttribute('role', 'status');
+  notice.append(document.createTextNode('โหมดทดสอบ · คำตอบตัวอย่าง ไม่ได้อ่านคำถามจริง '));
+  const live = document.createElement('a');
+  live.href = '/'; live.textContent = 'ใช้แมลงวันจริง';
+  notice.append(live);
+  document.getElementById('stage').append(notice);
   const mode = params.get('mock');
   const fail = params.get('fail');
   const decision = mode === 'inconclusive' || mode === 'ungrounded' ? 'inconclusive' : 'A';
@@ -159,7 +163,7 @@ export function installMock(params) {
     }
     if (u.endsWith('/api/stt')) {
       await sleep(900);
-      return new Response(JSON.stringify({ text: 'ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?' }), { headers: { 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ text: 'ระหว่างชากับกาแฟ ถ้าอยากลดคาเฟอีนควรเลือกอะไร?' }), { headers: { 'Content-Type': 'application/json' } });
     }
     return realFetch(url, opts);
   };

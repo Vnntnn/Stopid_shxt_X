@@ -59,16 +59,16 @@ function core(sum, lang, rng) {
   if (lang === 'th') {
     if (kind === 'cant') return [pick(rng, ['แมลงวันตัดสินใจไม่ได้', 'แมลงวันสรุปไม่ได้เลยจ้า', 'งงงงง แมลงวันตัดสินใจไม่ได้อ่ะ'])];
     if (kind === 'none') {
-      const l = label || 'ไม่มีผู้นำที่ชัดเจน';
-      return [pick(rng, [`แมลงวันบินไปลงที่ ${l}`, `แมลงวันลงที่ช่อง ${l}`]) + (p ? ` ${p} เปอร์เซ็นต์` : ''), 'แปลว่าไม่มีใครนำชัดเจน'];
+      const l = label || 'ยังเลือกไม่ได้';
+      return [pick(rng, [`แมลงวันบินไปลงที่ ${l}`, `แมลงวันลงที่ช่อง ${l}`]) + (p ? ` ${p} เปอร์เซ็นต์` : ''), 'ยังไม่มีตัวเลือกที่เหมาะชัดเจน'];
     }
     const lead = pick(rng, [`แมลงวันบินไปลงที่ ${label} แล้วจ้า`, `ติ๊ด! แมลงวันเลือก ${label}`, `แมลงวันบอกว่า ${label} จ้า`]);
     return [lead + (p ? ` ${p} เปอร์เซ็นต์` : '')];
   }
   if (kind === 'cant') return [pick(rng, ["Fly can't decide", "Fly can't decide. Too confusing", "Fly is confused and can't decide"]) + '.'];
   if (kind === 'none') {
-    const l = label || 'No clear leader';
-    return [pick(rng, [`Fly landed on ${l}`, `The fly picked ${l}`]) + (p ? `. ${p} percent` : '') + '.', 'So no clear leader.'];
+    const l = label || 'No clear choice';
+    return [pick(rng, [`Fly landed on ${l}`, `The fly picked ${l}`]) + (p ? `. ${p} percent` : '') + '.', 'There is no clear choice.'];
   }
   const lead = pick(rng, [`Fly landed on ${label}`, `The fly picked ${label}`, `Fly says ${label}`]);
   return [lead + (p ? `. ${p} percent` : '') + '.'];

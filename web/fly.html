@@ -1,9 +1,9 @@
 <!doctype html>
-<html lang="en">
+<html lang="th">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Fly Ask</title>
+<title>Fly Ask · แมลงวันช่วยคิด</title>
 <link rel="icon" href="data:,">
 <link rel="stylesheet" href="/static/fly.css">
 <script type="importmap">
@@ -12,38 +12,43 @@
 </head>
 <body>
 <main class="frame" id="frame">
+  <header class="garden-title">
+    <img src="/static/ceremonial-ornament.svg" width="80" height="47" alt="">
+    <div><p>FLY ASK · หึ่ง ๆ</p><h1>แมลงวันช่วยคิด</h1><span>ถามมา เดี๋ยวบินไปเลือกให้</span></div>
+  </header>
   <div class="stage" id="stage">
     <div class="fallback" id="webgl-fallback" hidden role="status">
-      3D view is unavailable in this browser (WebGL is off). The Fly still answers: use the panels.
+      แสดงแมลงวัน 3D ไม่ได้ในเบราว์เซอร์นี้ แต่ยังถามแมลงวันผ่านช่องข้อความได้
     </div>
-    <div class="sound" id="sound" role="group" aria-label="Fly sound">
-      <button type="button" class="mute" id="mute" aria-pressed="false" aria-label="Mute fly sound" title="Mute / unmute the fly">🔊</button>
-      <label class="sr-only" for="vol">Fly volume</label>
-      <input type="range" id="vol" min="0" max="100" step="1" value="60" title="Volume">
-      <label class="lvl" for="stupid">Stupid level</label>
-      <select id="stupid" title="How stupid the fly sounds">
-        <option value="0">Off</option>
-        <option value="1">Silly</option>
-        <option value="2" selected>MAXIMUM</option>
+    <div class="sound" id="sound" role="group" aria-label="เสียงแมลงวัน">
+      <button type="button" class="mute" id="mute" aria-pressed="false" aria-label="ปิดเสียงแมลงวัน" title="เปิด / ปิดเสียงแมลงวัน">🔊</button>
+      <label class="sr-only" for="vol">ความดังเสียงแมลงวัน</label>
+      <input type="range" id="vol" min="0" max="100" step="1" value="60" title="ความดังเสียงแมลงวัน">
+      <label class="lvl" for="stupid">ความกวน</label>
+      <select id="stupid" title="แมลงวันจะกวนแค่ไหน">
+        <option value="0">พูดปกติ</option>
+        <option value="1">กวนนิด ๆ</option>
+        <option value="2" selected>กวนสุด ๆ</option>
       </select>
     </div>
   </div>
   <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
+  <a class="model-credit" href="https://sketchfab.com/3d-models/housefly-5fe7cbd25f9a446d8bae005893d010dd" target="_blank" rel="noopener noreferrer">Housefly · Schmoldt5000 / schmoldt.art · CC BY 4.0</a>
 
   <section class="panel you" aria-labelledby="you-title">
-    <h2 id="you-title">You</h2>
-    <p class="hint">Choose what input you use: text or STT</p>
+    <h2 id="you-title">ถามแมลงวัน</h2>
+    <p class="hint">บอกสองตัวเลือกกับสิ่งที่สำคัญ แล้วให้แมลงวันช่วยเลือก</p>
     <div class="seg" role="tablist" aria-label="Input mode">
-      <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">Text</button>
-      <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">Voice</button>
+      <button type="button" role="tab" id="tab-text" aria-selected="true" aria-controls="pane-text">พิมพ์ข้อความ</button>
+      <button type="button" role="tab" id="tab-voice" aria-selected="false" aria-controls="pane-voice" tabindex="-1">ใช้เสียง</button>
     </div>
 
     <div id="pane-text" role="tabpanel" aria-labelledby="tab-text">
       <label class="sr-only" for="q">Your question</label>
-      <textarea id="q" rows="3" placeholder="ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?"></textarea>
+      <textarea id="q" rows="3" placeholder="ระหว่างพรรค A กับพรรค B ถ้าเน้นแก้ปัญหาค่าครองชีพ ควรเลือกพรรคไหน?"></textarea>
       <div class="row">
         <label class="check"><input type="checkbox" id="replay"> Replay cached</label>
-        <button type="button" class="primary" id="send">Send</button>
+        <button type="button" class="primary" id="send">ส่งคำถาม</button>
       </div>
     </div>
 
@@ -72,7 +77,7 @@
 
   <section class="panel out" id="out" aria-labelledby="out-title">
     <div class="out-head">
-      <h2 id="out-title">Output fly</h2>
+      <h2 id="out-title">คำตอบของแมลงวัน</h2>
       <div class="out-tools">
         <div class="seg mini" role="tablist" aria-label="Output view" id="view-seg">
           <button type="button" role="tab" id="view-cards" data-view="cards" aria-selected="true">Cards</button>
@@ -81,7 +86,7 @@
         <button type="button" class="mini" id="expand" aria-pressed="false" title="Show the output in a large drawer for debugging">Expand</button>
       </div>
     </div>
-    <p class="empty" id="out-empty">Ask something to see the Fly think.</p>
+    <p class="empty" id="out-empty">แมลงวันรอคำถามอยู่ ลองถามมาได้เลย</p>
     <div id="error" class="error" role="alert" hidden>
       <span id="error-msg"></span>
       <button type="button" id="retry">Retry</button>
@@ -92,8 +97,8 @@
       <div class="fly-says" id="fly-says" hidden>
         <p class="bubble" id="says-text" aria-live="polite"></p>
         <div class="says-row">
-          <button type="button" class="mini" id="replay-voice" title="Hear the fly again (no new request)">Replay voice</button>
-          <span class="voice-note" id="voice-note" role="status" hidden>Fly lost its voice</span>
+          <button type="button" class="mini" id="replay-voice" title="ฟังคำตอบของแมลงวันอีกครั้ง">ฟังแมลงวันอีกครั้ง</button>
+          <span class="voice-note" id="voice-note" role="status" hidden>แมลงวันส่งเสียงไม่ได้ตอนนี้</span>
         </div>
       </div>
       <ul class="bars" id="bars"></ul>
@@ -106,7 +111,7 @@
       <p class="disclaimer" id="disclaimer"></p>
     </div>
     <div class="stages-bar" id="stages-bar" hidden>
-      <h3>How the Fly got there</h3>
+      <h3>แมลงวันคิดยังไง</h3>
       <button type="button" class="mini" id="toggle-cards">Expand all</button>
     </div>
     <ol class="stages" id="stages" aria-live="polite" hidden></ol>

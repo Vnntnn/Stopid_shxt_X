@@ -1,11 +1,13 @@
-// Procedural 3D fly scene (three.js primitives only, no external assets).
+// Local textured Housefly model with a procedural loading fallback.
 import * as THREE from 'three';
+import { loadFlyModel, disposeModel, FLY_SCALE } from '/static/fly-model.js';
+import { createLandingFlower } from '/static/fly-meadow.js';
 
 const FONT = '"Noto Sans Thai", "Sarabun", system-ui, sans-serif';
 const PADS = {
-  A: { pos: new THREE.Vector3(-2.7, -1.2, -2.4), color: 0x5ad1ff },
-  B: { pos: new THREE.Vector3(2.1, -1.2, -2.4), color: 0xffb454 },
-  none: { pos: new THREE.Vector3(0, -1.2, -5.5), color: 0xb9a6ff },
+  A: { pos: new THREE.Vector3(-2.7, -1.2, -2.4), color: 0x70417c, flower: 'jasmine' },
+  B: { pos: new THREE.Vector3(2.1, -1.2, -2.4), color: 0xb3872f, flower: 'marigold' },
+  none: { pos: new THREE.Vector3(0, -1.2, -5.5), color: 0x355780, flower: 'lotus' },
 };
 const CENTER = new THREE.Vector3(0, 1.5, 0);
 const WING_FREQ = { idle: 9, listening: 30, thinking: 20, deciding: 24, inconclusive: 16 };
@@ -23,13 +25,35 @@ function glowTexture() {
   return new THREE.CanvasTexture(c);
 }
 
+function daylightEnvironment(renderer) {
+  const studio = new THREE.Scene();
+  studio.background = new THREE.Color(0xe9d8af);
+  // Broad sky and sunlight reflections reveal the eye facets and wing veins.
+  for (const [position, color, intensity, width, height] of [
+    [[-4, 6, 5], 0xffe6ac, 3, 5, 5],
+    [[5, 3, 2], 0xe4f3ff, 1.5, 3, 5],
+    [[0, 4, -5], 0xf4ffe6, 2, 5, 3],
+  ]) {
+    const card = new THREE.Mesh(new THREE.PlaneGeometry(width, height),
+      new THREE.MeshBasicMaterial({ color: new THREE.Color(color).multiplyScalar(intensity), toneMapped: false }));
+    card.position.set(...position);
+    card.lookAt(0, 1, 0);
+    studio.add(card);
+  }
+  const generator = new THREE.PMREMGenerator(renderer);
+  const environment = generator.fromScene(studio, 0.08);
+  generator.dispose();
+  disposeModel(studio);
+  return environment;
+}
+
 function labelSprite() {
   const canvas = document.createElement('canvas');
   canvas.width = 512;
   canvas.height = 192;
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false });
+  const mat = new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, toneMapped: false });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(3.4, 1.275, 1);
   sprite.userData.canvas = canvas;
@@ -41,7 +65,9 @@ function drawLabel(sprite, id, label, prob, win) {
   const g = canvas.getContext('2d');
   g.clearRect(0, 0, canvas.width, canvas.height);
   g.textAlign = 'center';
-  g.fillStyle = win ? '#ffffff' : 'rgba(235,240,255,0.88)';
+  g.fillStyle = win ? '#593264' : '#574329';
+  g.shadowColor = 'rgba(255,253,237,.95)';
+  g.shadowBlur = 8;
   g.font = `600 52px ${FONT}`;
   let text = label || id;
   while (g.measureText(text).width > 480 && text.length > 3) text = text.slice(0, -2);
@@ -49,7 +75,7 @@ function drawLabel(sprite, id, label, prob, win) {
   g.fillText(text, 256, 78);
   if (typeof prob === 'number') {
     g.font = `700 64px ${FONT}`;
-    g.fillStyle = win ? '#8dffc4' : '#aab4d6';
+    g.fillStyle = win ? '#70417c' : '#806127';
     g.fillText(Math.round(prob * 100) + '%', 256, 156);
   }
   sprite.material.map.needsUpdate = true;
@@ -65,44 +91,31 @@ export function createScene(container, { reducedMotion = false } = {}) {
   const motion = reducedMotion ? 0.35 : 1;
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   renderer.setClearColor(0x000000, 0);
+  renderer.outputColorSpace = THREE.SRGBColorSpace;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 0.95;
   renderer.domElement.setAttribute('aria-hidden', 'true');
   container.appendChild(renderer.domElement);
 
   const scene = new THREE.Scene();
-  scene.fog = new THREE.FogExp2(0x05070f, 0.035);
+  scene.fog = new THREE.FogExp2(0xf5e5bb, 0.055);
+  const environment = daylightEnvironment(renderer);
+  scene.environment = environment.texture;
   const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 100);
   const camBase = new THREE.Vector3(0, 4.2, 9.5);
 
-  scene.add(new THREE.HemisphereLight(0x9bb4ff, 0x1a1030, 0.9));
-  const key = new THREE.PointLight(0xffd6c0, 40, 30);
-  key.position.set(3, 6, 6);
+  scene.add(new THREE.HemisphereLight(0xfff5df, 0x9d995f, 1.5));
+  const key = new THREE.DirectionalLight(0xffe4b2, 2.8);
+  key.position.set(-3, 6, 5);
   scene.add(key);
-  const rim = new THREE.PointLight(0x6f8cff, 30, 30);
-  rim.position.set(-5, 2, -4);
+  const fill = new THREE.DirectionalLight(0xe0f0ff, 0.8);
+  fill.position.set(4, 2, 6);
+  scene.add(fill);
+  const rim = new THREE.DirectionalLight(0xfff9df, 1.5);
+  rim.position.set(1, 4, -5);
   scene.add(rim);
 
-  // Starfield
-  const starCount = 700;
-  const sp = new Float32Array(starCount * 3);
-  for (let i = 0; i < starCount; i++) {
-    const r = 18 + Math.random() * 30;
-    const th = Math.random() * Math.PI * 2;
-    const ph = Math.acos(2 * Math.random() - 1);
-    sp[i * 3] = r * Math.sin(ph) * Math.cos(th);
-    sp[i * 3 + 1] = r * Math.cos(ph) * 0.7;
-    sp[i * 3 + 2] = -Math.abs(r * Math.sin(ph) * Math.sin(th)) - 4;
-  }
-  const starGeo = new THREE.BufferGeometry();
-  starGeo.setAttribute('position', new THREE.BufferAttribute(sp, 3));
-  const stars = new THREE.Points(starGeo, new THREE.PointsMaterial({ color: 0xbfd0ff, size: 0.09, transparent: true, opacity: 0.8, fog: false }));
-  scene.add(stars);
-
-  // Floor grid
-  const grid = new THREE.GridHelper(40, 40, 0x24305a, 0x141c38);
-  grid.position.y = -2.1;
-  grid.material.transparent = true;
-  grid.material.opacity = 0.45;
-  scene.add(grid);
+  // Keep the canvas transparent so the ceremonial garden artwork stays visible.
 
   // Pads
   const pads = {};
@@ -110,25 +123,28 @@ export function createScene(container, { reducedMotion = false } = {}) {
     const grp = new THREE.Group();
     grp.position.copy(def.pos);
     const disc = new THREE.Mesh(
-      new THREE.CircleGeometry(1.0, 40),
-      new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.28, side: THREE.DoubleSide }),
+      new THREE.CircleGeometry(0.52, 40),
+      new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.28, side: THREE.DoubleSide, toneMapped: false }),
     );
     disc.rotation.x = -Math.PI / 2;
     const ring = new THREE.Mesh(
-      new THREE.RingGeometry(1.0, 1.12, 48),
-      new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide }),
+      new THREE.RingGeometry(1.05, 1.08, 48),
+      new THREE.MeshBasicMaterial({ color: def.color, transparent: true, opacity: 0.8, side: THREE.DoubleSide, toneMapped: false }),
     );
     ring.rotation.x = -Math.PI / 2;
+    ring.position.y = -0.12;
     const sprite = labelSprite();
     sprite.position.set(0, id === 'none' ? 1.2 : 1.45, 0);
     if (id !== 'none') drawLabel(sprite, id, id, undefined, false);
-    grp.add(disc, ring, sprite);
+    grp.add(createLandingFlower(def.flower), disc, ring, sprite);
     scene.add(grp);
     pads[id] = { grp, disc, ring, sprite, glow: 0, target: 0, label: null, prob: undefined };
   }
 
   // Fly
   const fly = new THREE.Group();
+  const fallback = new THREE.Group();
+  fly.add(fallback);
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1b2038, roughness: 0.45, metalness: 0.3, emissive: 0x3a2a7a, emissiveIntensity: 0.55 });
   const eyeMat = new THREE.MeshStandardMaterial({ color: 0xd8182a, roughness: 0.25, emissive: 0xff2030, emissiveIntensity: 0.9 });
   const wingMat = new THREE.MeshBasicMaterial({ color: 0xbfe4ff, transparent: true, opacity: 0.42, side: THREE.DoubleSide, depthWrite: false });
@@ -153,7 +169,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     s.scale.set(1.0 - Math.abs(z) * 0.1, 0.9, 1);
     return s;
   });
-  fly.add(abdomen, thorax, head, eyeL, eyeR, ...stripes);
+  fallback.add(abdomen, thorax, head, eyeL, eyeR, ...stripes);
 
   const wingGeo = new THREE.CircleGeometry(1, 28);
   const makeWing = (side) => {
@@ -166,7 +182,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
     w.position.set(side * 0.95, 0, -0.3);
     w.rotation.z = 0;
     pivot.add(w);
-    fly.add(pivot);
+    fallback.add(pivot);
     return pivot;
   };
   const wingL = makeWing(-1);
@@ -189,21 +205,44 @@ export function createScene(container, { reducedMotion = false } = {}) {
       lower.rotation.z = side * 0.35;
       hip.add(upper, lower);
       hip.rotation.y = side * (i - 1) * 0.35;
-      fly.add(hip);
+      fallback.add(hip);
       legs.push(hip);
     }
   }
   const glowTex = glowTexture();
-  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0x7a5cff, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false }));
+  const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: 0xb8ddce, transparent: true, opacity: 0.12, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
   glow.scale.set(5, 5, 1);
   fly.add(glow);
-  fly.scale.setScalar(0.78);
+  fly.scale.setScalar(FLY_SCALE);
   scene.add(fly);
+  let realisticFly = null;
+  let disposed = false;
+  let modelStatus = 'loading';
+  let landingHeight = -new THREE.Box3().setFromObject(fallback).min.y * FLY_SCALE + 0.06;
+  const modelReady = loadFlyModel().then((loaded) => {
+    if (disposed) { disposeModel(loaded.model); return false; }
+    realisticFly = loaded;
+    landingHeight = loaded.landingHeight;
+    if (dive) {
+      dive.curve.v2.y = PADS[dive.padId].pos.y + landingHeight;
+      if (landed) pos.y = dive.curve.v2.y;
+    }
+    fly.add(loaded.model);
+    fly.remove(fallback);
+    disposeModel(fallback);
+    glow.scale.set(3.8, 3.8, 1);
+    modelStatus = 'ready';
+    return true;
+  }).catch((error) => {
+    modelStatus = 'fallback';
+    console.warn('The local fly model could not load; using the procedural fly.', error);
+    return false;
+  });
 
   // Listening pulse ring
   const pulse = new THREE.Mesh(
     new THREE.RingGeometry(0.95, 1.0, 64),
-    new THREE.MeshBasicMaterial({ color: 0x8dffc4, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false }),
+    new THREE.MeshBasicMaterial({ color: 0x69854e, transparent: true, opacity: 0, side: THREE.DoubleSide, depthWrite: false, toneMapped: false }),
   );
   scene.add(pulse);
 
@@ -224,7 +263,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
   function setState(next, opts = {}) {
     if (next === 'deciding') {
       const padId = PADS[opts.pad] ? opts.pad : 'none';
-      const end = PADS[padId].pos.clone().add(new THREE.Vector3(0, 0.38, 0));
+      const end = PADS[padId].pos.clone().add(new THREE.Vector3(0, landingHeight, 0));
       const mid = pos.clone().lerp(end, 0.5);
       mid.y = Math.max(pos.y, end.y) + 1.4;
       dive = { curve: new THREE.QuadraticBezierCurve3(pos.clone(), mid, end), t: 0, dur: reducedMotion ? 2.2 : 3.2, padId };
@@ -338,17 +377,18 @@ export function createScene(container, { reducedMotion = false } = {}) {
     fly.rotation.y = yaw + 0.3;
     fly.rotation.x = state === 'thinking' ? 0.15 : state === 'inconclusive' ? Math.sin(t * 7) * 0.12 * motion : Math.sin(t * 1.1) * 0.04 * motion;
     fly.rotation.z = state === 'thinking' ? -0.25 : 0;
-    const amp = (1 - fold) * 0.75 + 0.05;
+    const amp = (1 - fold) * 0.75 + (landed ? 0 : 0.05);
     const flap = Math.sin(flapPhase * Math.PI * 2) * amp;
     const sweep = fold * 1.2;
     wingL.rotation.set(0, sweep, flap);
     wingR.rotation.set(0, -sweep, -flap);
     wingL.rotation.z = flap + 0.15 * (1 - fold);
     wingR.rotation.z = -flap - 0.15 * (1 - fold);
-    const glowBase = state === 'listening' ? 0.8 : 0.5;
-    glow.material.opacity += (glowBase + Math.sin(t * 2) * 0.08 - glow.material.opacity) * Math.min(1, dt * 4);
+    const glowBase = state === 'listening' ? 0.22 : 0.08;
+    glow.material.opacity += (glowBase + Math.sin(t * 2) * 0.02 - glow.material.opacity) * Math.min(1, dt * 4);
     // Subtle leg shuffle when landed
     for (let i = 0; i < legs.length; i++) legs[i].rotation.x = landed ? 0 : Math.sin(t * 3 + i) * 0.05 * motion;
+    if (realisticFly) realisticFly.update({ flap, fold, t, landed, motion, state });
 
     // Pulse ring
     if (state === 'listening') {
@@ -368,7 +408,7 @@ export function createScene(container, { reducedMotion = false } = {}) {
       p.glow += (p.target - p.glow) * Math.min(1, dt * 4);
       p.disc.material.opacity = 0.22 + p.glow * 0.5 + Math.sin(t * 2 + id.length) * 0.04 * motion;
       p.ring.material.opacity = 0.55 + p.glow * 0.45;
-      p.grp.scale.setScalar(1 + p.glow * 0.18);
+      p.ring.scale.setScalar(1 + p.glow * 0.12);
       if ((prev > 0.5) !== (p.glow > 0.5)) lastWinner = null;
     }
     if (lastWinner === null) { refreshWinnerLabels(); lastWinner = true; }
@@ -376,27 +416,30 @@ export function createScene(container, { reducedMotion = false } = {}) {
     // Camera drift
     camera.position.set(camBase.x + Math.sin(t * 0.25) * 0.7 * motion, camBase.y + Math.sin(t * 0.19) * 0.3 * motion, camBase.z);
     camera.lookAt(0, -0.2, 0);
-    stars.rotation.y = t * 0.01 * motion;
 
     renderer.render(scene, camera);
   }
   frame();
 
   function dispose() {
+    disposed = true;
     cancelAnimationFrame(raf);
     ro.disconnect();
     const geos = new Set(), mats = new Set(), texs = new Set();
     scene.traverse((o) => {
+      if (o.isInstancedMesh) o.dispose();
       if (o.geometry) geos.add(o.geometry);
       if (o.material) (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => mats.add(m));
     });
-    mats.forEach((m) => { if (m.map) texs.add(m.map); });
+    mats.forEach((m) => { for (const value of Object.values(m)) if (value?.isTexture) texs.add(value); });
     geos.forEach((g) => g.dispose());
     mats.forEach((m) => m.dispose());
     texs.forEach((x) => x.dispose());
+    environment.dispose();
     renderer.dispose();
     renderer.domElement.remove();
   }
 
-  return { ok: true, setState, setCandidates, dispose, get state() { return state; }, get landed() { return landed; } };
+  return { ok: true, setState, setCandidates, dispose, modelReady,
+    get modelStatus() { return modelStatus; }, get state() { return state; }, get landed() { return landed; } };
 }

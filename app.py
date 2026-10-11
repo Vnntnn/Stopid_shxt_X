@@ -11,7 +11,7 @@ import time
 from urllib.parse import urlsplit
 
 from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
@@ -160,8 +160,11 @@ def _project_or_404(project_id):
     return project
 
 @app.get("/")
-def index():
-    return FileResponse(ROOT / "web" / "index.html")
+def fly_page():
+    page = ROOT / "web" / "fly.html"
+    if not page.is_file():
+        raise HTTPException(404, "The Fly page (web/fly.html) has not been built yet.")
+    return FileResponse(page)
 
 @app.get("/api/health")
 def health():
@@ -344,11 +347,11 @@ async def decide(request: Request):
 
 
 @app.get("/fly")
-def fly_page():
-    page = ROOT / "web" / "fly.html"
-    if not page.is_file():
-        raise HTTPException(404, "The Fly page (web/fly.html) has not been built yet.")
-    return FileResponse(page)
+def redirect_fly_page(request: Request):
+    target = "/"
+    if request.url.query:
+        target += "?" + request.url.query
+    return RedirectResponse(target, status_code=308)
 
 
 @app.get("/api/ask/health")

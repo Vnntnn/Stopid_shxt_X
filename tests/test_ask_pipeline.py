@@ -229,10 +229,45 @@ class LLMTests(unittest.IsolatedAsyncioTestCase):
 
 
 class ValidationTests(unittest.IsolatedAsyncioTestCase):
+    def test_generic_options_are_valid_and_legacy_parties_are_normalised(self):
+        raw = answer_json()
+        raw["options"] = raw.pop("parties")
+        raw["options"][0]["name"] = "Walk"
+        raw["options"][1]["name"] = "Drive"
+        raw["options"][0]["label"] = "Walk"
+        raw["options"][1]["label"] = "Drive"
+        raw["criterion"] = "best fits the low-cost commute"
+        out = ask_pipeline.validate_answer(raw)
+        self.assertEqual([p["name"] for p in out["options"]], ["Walk", "Drive"])
+        self.assertNotIn("parties", out)
+        self.assertEqual([p["name"] for p in ask_pipeline.validate_answer(answer_json())["options"]], ["One", "Two"])
+        for bad in ([], "not a list", [{"id": "A", "name": "Walk"}]*2):
+            with self.subTest(bad=bad), self.assertRaises(ask_pipeline.Invalid):
+                ask_pipeline.validate_answer({**raw, "options": bad})
+
     def test_valid_answer_passes(self):
         out = ask_pipeline.validate_answer(answer_json())
-        self.assertEqual([p["name"] for p in out["parties"]], ["One", "Two"])
+        self.assertEqual([p["name"] for p in out["options"]], ["One", "Two"])
         self.assertEqual(len(out["facts"]), 2)
+
+    async def test_missing_display_label_is_repaired_without_changing_model_name(self):
+        data = answer_json(language="th")
+        data["options"] = [{"id": "A", "name": "Tea"}, {"id": "B", "name": "Coffee", "label": "กาแฟ"}]
+        data.pop("parties")
+        prompts = []
+
+        def handler(request):
+            prompts.append(json.loads(request.content)["messages"][1]["content"])
+            response = json.loads(json.dumps(data))
+            if len(prompts) > 1:
+                response["options"][0]["label"] = "ชา"
+            return httpx.Response(200, json=or_response(response))
+
+        llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k"}, httpx.MockTransport(handler))
+        answer, _ = await ask_pipeline.ask_llm(llm, "ชา หรือ กาแฟ", {})
+        self.assertEqual(len(prompts), 2)
+        self.assertIn("option label", prompts[1])
+        self.assertEqual([(p["name"], p["label"]) for p in answer["options"]], [("Tea", "ชา"), ("Coffee", "กาแฟ")])
 
     def test_extra_top_level_keys_are_dropped(self):
         out = ask_pipeline.validate_answer(answer_json(reasoning="blah", extra=1))
@@ -267,8 +302,8 @@ class ValidationTests(unittest.IsolatedAsyncioTestCase):
         llm = llm_layer.LLM({"OPENROUTER_API_KEY": "k"}, httpx.MockTransport(handler))
         answer, _ = await ask_pipeline.ask_llm(llm, "u", {})
         self.assertEqual(len(prompts), 2)
-        self.assertIn("exactly 2 parties", prompts[1])
-        self.assertEqual(answer["parties"][1]["name"], "Two")
+        self.assertIn("exactly 2 options", prompts[1])
+        self.assertEqual(answer["options"][1]["name"], "Two")
 
     async def test_non_json_is_repaired_and_second_failure_is_a_clean_error(self):
         texts = iter(["not json", json.dumps(answer_json())])
@@ -291,10 +326,10 @@ class PoolTests(unittest.TestCase):
         pool = ask_pipeline.build_pool(self.answer(), FakeAgent())
         self.assertEqual(pool["state"], "Findings: One leads by two points. Two is close behind.")
         self.assertEqual(pool["instructions"], "Which candidate is ahead in the latest polls?")
-        self.assertEqual(pool["candidates"], {"A": "One", "B": "Two", "none": "No clear leader"})
+        self.assertEqual(pool["candidates"], {"A": "One", "B": "Two", "none": "No clear choice"})
         self.assertEqual(pool["claims"]["A"], "One is ahead in the latest polls")
         payload = ask_pipeline.make_payload(pool, {"A": "B", "B": "A", "none": "none"})
-        self.assertEqual(payload["questions"]["vote"]["criteria"], {"A": "Two", "B": "One", "none": "No clear leader"})
+        self.assertEqual(payload["questions"]["vote"]["criteria"], {"A": "Two", "B": "One", "none": "No clear choice"})
         self.assertIsInstance(payload["state"], str)
 
     def test_state_is_capped_at_400_chars_on_a_word_boundary(self):
@@ -306,7 +341,7 @@ class PoolTests(unittest.TestCase):
 
     def test_option_over_48_tokens_is_shortened_not_rejected(self):
         name = " ".join(f"w{i}" for i in range(60))
-        pool = ask_pipeline.build_pool({**self.answer(), "parties": [{"id": "A", "name": name, "aliases": []},
+        pool = ask_pipeline.build_pool({**self.answer(), "options": [{"id": "A", "name": name, "aliases": []},
                                                                        {"id": "B", "name": "Two", "aliases": []}]}, FakeAgent())
         self.assertLessEqual(len(("\n- A: " + pool["candidates"]["A"]).split()), 48)
 
@@ -328,7 +363,7 @@ class PoolTests(unittest.TestCase):
         agent = FakeAgent(max_len=1024, head_max_len=256)
         agent.tok = tok
         long_name = "The Very Long Party Name Of The Democratic Peoples Republican Alliance " * 3
-        pool = ask_pipeline.build_pool({**self.answer(), "parties": [{"id": "A", "name": long_name.strip()[:60], "aliases": []},
+        pool = ask_pipeline.build_pool({**self.answer(), "options": [{"id": "A", "name": long_name.strip()[:60], "aliases": []},
                                                                        {"id": "B", "name": "Two", "aliases": []}]}, agent)
         self.assertLessEqual(len(encode(tok, "\n- A: " + pool["candidates"]["A"])), 48)
 
@@ -403,8 +438,8 @@ class DecisionTests(TmpCacheCase):
         self.assertIn("People's Party", final["answer_text"])
         self.assertEqual(final["disclaimer"], "Entertainment demo - not a prediction")
         self.assertEqual(final["interpretation"]["language"], "th")
-        self.assertRegex(final["answer_text"], "แหล่งข้อมูล")
-        self.assertEqual(final["candidates"][2]["label"], "ไม่มีผู้นำที่ชัดเจน")
+        self.assertRegex(final["answer_text"], "แมลงวันเลือก")
+        self.assertEqual(final["candidates"][2]["label"], "ยังเลือกไม่ได้")
         self.assertTrue(all("FAKE-DEMO" in s["title"] for s in final["sources"]))
 
     def test_order_is_seeded_by_text(self):
@@ -429,6 +464,20 @@ class DecisionTests(TmpCacheCase):
 
 
 class CacheTests(TmpCacheCase):
+    def test_english_label_cache_from_previous_prompt_is_not_replayed(self):
+        self.cache.path.write_text(json.dumps({ask_pipeline.normalise(DEMO): {
+            "version": 2, "saved_at": time.time(), "final": {"answer_text": "Tea"}}}))
+        self.assertIsNone(self.cache.get(DEMO))
+
+    def test_old_political_prompt_cache_is_not_replayed(self):
+        self.cache.path.write_text(json.dumps({ask_pipeline.normalise(DEMO): {
+            "saved_at": time.time(), "final": {"answer_text": "stale political answer"}}}))
+        self.assertIsNone(self.cache.get(DEMO))
+        final = final_of(collect(cache=self.cache, replay=True))["data"]
+        self.assertFalse(final["from_cache"])
+        self.assertNotEqual(final["answer_text"], "stale political answer")
+        self.assertEqual(self.cache.get(DEMO), final)
+
     def test_live_result_is_cached_and_replay_serves_it_without_llm_or_model(self):
         live = final_of(collect(runtime=FakeRuntime(), cache=self.cache))["data"]
         self.assertFalse(live["from_cache"])
@@ -461,6 +510,52 @@ class CacheTests(TmpCacheCase):
         collect(runtime=FakeRuntime(), cache=self.cache)
         json.loads(self.cache.path.read_text())
         self.assertEqual([p.name for p in self.cache.path.parent.iterdir()], ["ask_cache.json"])
+
+
+class GenericChoiceTests(TmpCacheCase):
+    def test_nonpolitical_choices_preserve_options_goals_and_swapped_identity(self):
+        cases = [
+            ("Tea", "Coffee", "ชา", "กาแฟ", "contains less caffeine", "User: wants a drink with less caffeine.", "th", "A"),
+            ("Walk", "Drive", "Walk", "Drive", "best fits the low-cost commute", "User: nearby shop, no rush, minimize fuel cost.", "en", "A"),
+            ("Laptop", "Desktop", "โน้ตบุ๊ก", "คอมตั้งโต๊ะ", "best supports daily travel", "User: needs to work while travelling.", "th", "B"),
+        ]
+        for a, b, label_a, label_b, criterion, constraint, language, winner in cases:
+            with self.subTest(a=a, b=b):
+                data = answer_json(language=language, criterion=criterion, facts=[
+                    {"text": constraint}, {"text": f"{a} is one available alternative."},
+                    {"text": f"{b} is the other available alternative."}])
+                data["options"] = [{"id": "A", "name": a, "label": label_a}, {"id": "B", "name": b, "label": label_b}]
+                data.pop("parties")
+                llm = llm_layer.LLM({"OPENROUTER_API_KEY": "test"}, httpx.MockTransport(
+                    lambda request: httpx.Response(200, json=or_response(data))))
+                runtime = FakeRuntime(prefer=("text", a if winner == "A" else b))
+                text = f"Choose {a} or {b}: {constraint}"
+                events = collect(text, runtime=runtime, llm=llm, cache=self.cache)
+                final = final_of(events)["data"]
+                self.assertEqual(final["decision"], winner)
+                self.assertEqual([c["label"] for c in final["candidates"][:2]], [label_a, label_b])
+                self.assertIn(label_a if winner == "A" else label_b, final["answer_text"])
+                self.assertNotIn("being ahead", final["answer_text"])
+                self.assertEqual(final["interpretation"]["question_en"], f"Which candidate {criterion}?")
+                self.assertIn(constraint, runtime.payloads[0]["state"])
+                self.assertEqual(len(runtime.payloads), 2)
+                options = next(e["data"]["options"] for e in events if e["stage"] == "interpret" and e["status"] == "done")
+                self.assertEqual([o["name"] for o in options], [a, b])
+                self.assertEqual([o["label"] for o in options], [label_a, label_b])
+                for payload in runtime.payloads:
+                    self.assertEqual(set(payload["questions"]["vote"]["criteria"].values()), {a, b, "No clear choice"})
+                replay = final_of(collect(text, runtime=FakeRuntime(status="loading"), llm=llm_layer.LLM({}),
+                                          cache=self.cache, replay=True))["data"]
+                self.assertEqual(replay["candidates"], final["candidates"])
+                self.assertEqual(replay["answer_text"], final["answer_text"])
+                self.assertTrue(replay["from_cache"])
+
+    def test_no_clear_choice_is_generic_in_both_languages(self):
+        for language in ("th", "en"):
+            text = ask_pipeline.answer_text(language, "none", None, {"A": .1, "B": .1, "none": .8}, None)
+            self.assertNotIn("leader", text)
+            self.assertNotIn("ฝ่ายใดนำ", text)
+            self.assertIn("80", text)
 
 
 class SingleCallPipelineTests(TmpCacheCase):
@@ -776,9 +871,28 @@ class RouteTests(TmpCacheCase):
         self.assertTrue(body["openrouter"] and body["stt"])
         self.assertNotIn("gemini", body)
 
+    def test_root_serves_fly_page_and_assets(self):
+        response = self.client.get("/")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.headers["content-type"].startswith("text/html"))
+        self.assertEqual(response.content, (ROOT / "web" / "fly.html").read_bytes())
+        for asset in ("fly.css", "fly.js", "fly-scene.js"):
+            self.assertEqual(self.client.get(f"/static/{asset}").status_code, 200)
+
+    def test_fly_redirects_to_root_preserving_query(self):
+        for query in ("", "?mock=1", "?mock=1&fail=research&text=a%2Fb"):
+            with self.subTest(query=query):
+                response = self.client.get("/fly" + query, follow_redirects=False)
+                self.assertEqual(response.status_code, 308)
+                self.assertEqual(response.headers["location"], "/" + query)
+                followed = self.client.get("/fly" + query)
+                self.assertEqual(followed.status_code, 200)
+                self.assertEqual(followed.url.path, "/")
+                self.assertEqual(followed.content, (ROOT / "web" / "fly.html").read_bytes())
+
     def test_fly_page_404_until_built(self):
         with patch.object(app_module, "ROOT", Path(self.tmp.name)):
-            response = self.client.get("/fly")
+            response = self.client.get("/")
         self.assertEqual(response.status_code, 404)
         self.assertIn("fly.html", response.json()["detail"])
 

@@ -41,7 +41,7 @@ function savePrefs() { try { localStorage.setItem(SOUND_KEY, JSON.stringify(pref
 function syncSoundUi() {
   $('mute').setAttribute('aria-pressed', String(prefs.muted));
   $('mute').textContent = prefs.muted ? '🔇' : '🔊';
-  $('mute').setAttribute('aria-label', prefs.muted ? 'Unmute fly sound' : 'Mute fly sound');
+  $('mute').setAttribute('aria-label', prefs.muted ? 'เปิดเสียงแมลงวัน' : 'ปิดเสียงแมลงวัน');
   $('vol').value = String(Math.round(prefs.volume * 100));
   $('stupid').value = String(prefs.level);
 }
@@ -166,6 +166,10 @@ function labelsFor(state) {
   const out = {};
   const pool = state?.stages?.pool?.data?.candidates;
   if (isObj(pool)) for (const k of Object.keys(pool)) out[k] = pool[k];
+  const interpretation = state?.stages?.interpret?.data;
+  for (const c of interpretation?.options || interpretation?.parties || []) {
+    if (c?.id && c.label) out[c.id] = c.label;
+  }
   for (const c of state?.final?.candidates || []) if (c && c.id && c.label) out[c.id] = c.label;
   return out;
 }
@@ -188,13 +192,13 @@ function metaRow(items) {
 function cardInterpret(d, st) {
   const f = document.createDocumentFragment();
   if (d.echo) f.append(el('blockquote', 'quote', d.echo));
-  const parties = Array.isArray(d.parties) ? d.parties : [];
-  if (parties.length) {
+  const options = Array.isArray(d.options) ? d.options : (Array.isArray(d.parties) ? d.parties : []);
+  if (options.length) {
     const box = el('div', 'chips');
-    for (const p of parties) {
+    for (const p of options) {
       const c = el('div', 'party');
       c.dataset.id = p.id || '';
-      c.append(el('span', 'pname', p.name || p.id || '?'));
+      c.append(el('span', 'pname', p.label || p.name || p.id || '?'));
       const al = Array.isArray(p.aliases) ? p.aliases.filter(Boolean) : [];
       if (al.length) c.append(el('span', 'aliases', al.join(' · ')));
       box.append(c);
@@ -501,7 +505,7 @@ function renderFinal(f) {
     fill.style.width = '0%';
     track.append(fill);
     li.append(l, p, track);
-    li.title = c.claim || '';
+    li.title = `${c.label || c.id} (${formatPct(c.prob || 0)})`;
     requestAnimationFrame(() => requestAnimationFrame(() => { fill.style.width = Math.round((c.prob || 0) * 100) + '%'; }));
     return li;
   }));
@@ -579,7 +583,7 @@ async function ask(text) {
       const run = runSeq;
       scene.setCandidates(state.final.candidates);
       renderFinal(state.final);
-      $('says-text').textContent = 'Fly says: ' + voice.text;
+      $('says-text').textContent = (voice.lang === 'th' ? 'แมลงวันบอกว่า: ' : 'Fly says: ') + voice.text;
       $('fly-says').hidden = false;
       watchLanding(voice, run);
       const d = state.final.decision;
