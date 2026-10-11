@@ -196,10 +196,12 @@ const BASE = {
 // o: { dy, scale, noseDx, lw:[x,y], rw:[x,y], le, re, shDx } -> 33 landmarks {x, y, visibility}
 export function standingPose(o = {}) {
   const dy = o.dy || 0, sc = o.scale || 1, shDx = o.shDx || 0;
+  const tilt = o.tilt || 0; // > 0: the person's LEFT shoulder drops (shoulder line tilts), used by the Copy me dance
   const sh = (p, dx = 0) => [0.5 + (p[0] - 0.5) * sc + dx, 0.45 + (p[1] - 0.45) * sc + dy];
   const pt = (p, v = 1) => ({ x: p[0], y: p[1], visibility: v });
   const nose = sh(BASE.nose, (o.noseDx || 0));
   const ls = sh(BASE.ls, shDx), rs = sh(BASE.rs, shDx);
+  if (tilt) { ls[1] += tilt; rs[1] -= tilt; }
   const lw = o.lw ? [o.lw[0], o.lw[1] + dy] : sh(BASE.lw, shDx);
   const rw = o.rw ? [o.rw[0], o.rw[1] + dy] : sh(BASE.rw, shDx);
   const le = o.le ? [o.le[0], o.le[1] + dy] : sh(BASE.le, shDx);
@@ -235,13 +237,32 @@ export const MOCK_SCENES = {
   jump: { dur: 1500, rest: 2200, pose: (t, a) => ({ dy: t < 0.6 ? -0.10 * Math.sin(Math.PI * t / 0.6) * a : 0 }) },
   squat: { dur: 2200, rest: 3600, pose: (t, a) => ({ dy: 0.12 * a * ease(t / 0.7) * (t < 1.6 ? 1 : 1 - ease((t - 1.6) / 0.5)) }) },
 };
+// ---- "Copy me" dance: held poses with a 0.3 s ease-in, standing in between. Names start with d_ (the others are reused as they are). ----
+const ARM_UP = (side, k) => (side === 'r' ? { rw: [0.37, 0.70 - 0.56 * k], re: [0.38, 0.58 - 0.25 * k] } : { lw: [0.63, 0.70 - 0.56 * k], le: [0.62, 0.58 - 0.25 * k] });
+export const DANCE_SCENES = {
+  d_stand: { dur: 2600, rest: 0, pose: () => ({}) },
+  d_right_hand: { dur: 2200, rest: 300, pose: (t) => ARM_UP('r', ease(t / 0.4)) },
+  d_left_hand: { dur: 2200, rest: 300, pose: (t) => ARM_UP('l', ease(t / 0.4)) },
+  d_both_up: { dur: 2200, rest: 300, pose: (t) => { const k = ease(t / 0.4); return { lw: [0.62, 0.70 - 0.58 * k], rw: [0.38, 0.70 - 0.58 * k], le: [0.62, 0.58 - 0.3 * k], re: [0.38, 0.58 - 0.3 * k] }; } },
+  d_t_pose: { dur: 2200, rest: 300, pose: (t) => { const k = ease(t / 0.5); return { lw: [0.60 + 0.28 * k, 0.70 - 0.25 * k], rw: [0.40 - 0.28 * k, 0.70 - 0.25 * k], le: [0.60 + 0.14 * k, 0.58 - 0.13 * k], re: [0.40 - 0.14 * k, 0.58 - 0.13 * k] }; } },
+  d_lean_left: { dur: 2200, rest: 300, pose: (t) => ({ tilt: 0.035 * ease(t / 0.4), shDx: 0.03 * ease(t / 0.4), noseDx: 0.05 * ease(t / 0.4) }) },
+  d_lean_right: { dur: 2200, rest: 300, pose: (t) => ({ tilt: -0.035 * ease(t / 0.4), shDx: -0.03 * ease(t / 0.4), noseDx: -0.05 * ease(t / 0.4) }) },
+  d_squat: { dur: 2200, rest: 300, pose: (t) => ({ dy: 0.12 * ease(t / 0.6) * (t < 1.7 ? 1 : 1 - ease((t - 1.7) / 0.5)) }) },
+};
+export const DANCE_ORDER = ['d_stand', 'd_right_hand', 'd_left_hand', 'd_both_up', 'd_t_pose', 'd_lean_left', 'd_lean_right', 'd_squat', 'jump', 'clap', 'wave', 'thumbs_up', 'peace', 'fist', 'open_palm', 'point_up'];
+export const DANCE_CAPTIONS = {
+  d_stand: 'Stand still (calibrating)', d_right_hand: 'Raise right hand', d_left_hand: 'Raise left hand', d_both_up: 'Both hands up', d_t_pose: 'T-pose, arms wide',
+  d_lean_left: 'Lean left', d_lean_right: 'Lean right', d_squat: 'Squat', jump: 'Jump', clap: 'Clap', wave: 'Wave', thumbs_up: 'Thumbs up', peace: 'Peace sign', fist: 'Fist', open_palm: 'Open palm', point_up: 'Point up',
+};
+const sceneOf = (name) => MOCK_SCENES[name] || DANCE_SCENES[name];
+
 const HAND_SCENES = { thumbs_up: 'Thumb_Up', thumbs_down: 'Thumb_Down', peace: 'Victory', open_palm: 'Open_Palm', fist: 'Closed_Fist', point_up: 'Pointing_Up', i_love_you: 'ILoveYou' };
 for (const [g, label] of Object.entries(HAND_SCENES)) MOCK_SCENES[g] = { dur: 1700, rest: 700, pose: () => ({}), hands: () => [{ label, score: 0.93 }] };
 export const MOCK_ORDER = ['wave', 'hands_up', 'hand_up_left', 'hand_up_right', 't_pose', 'clap', 'lean_left', 'lean_right', 'jump', 'squat', 'thumbs_up', 'thumbs_down', 'peace', 'open_palm', 'fist', 'point_up', 'i_love_you'];
 
 // Frames of one scene: [{ts, pose, hands}] starting at ts = t0, restMs of standing first. noise = sigma on x/y.
 export function buildScene(name, { t0 = 0, fps = 15, amp = 1, noise = 0, seed = 1, rest, tail = 500, handEvery = 2 } = {}) {
-  const sc = MOCK_SCENES[name];
+  const sc = sceneOf(name);
   const rand = rng32(seed);
   const gauss = () => { let u = 0; for (let i = 0; i < 6; i++) u += rand(); return (u - 3) / 0.7071; }; // ~N(0,1)
   const frames = [];
@@ -264,7 +285,7 @@ export function buildScene(name, { t0 = 0, fps = 15, amp = 1, noise = 0, seed = 
 export function buildTimeline(order = MOCK_ORDER) {
   let t = 0; const items = [];
   for (const name of order) {
-    const s = MOCK_SCENES[name];
+    const s = sceneOf(name);
     items.push({ name, start: t, actionStart: t + s.rest, end: t + s.rest + s.dur + 500 });
     t += s.rest + s.dur + 500;
   }
@@ -274,7 +295,7 @@ export function mockFrameAt(timeline, tMs, fps = 15) {
   const total = timeline.totalMs;
   const t = ((tMs % total) + total) % total;
   const it = timeline.items.find((x) => t >= x.start && t < x.end) || timeline.items[0];
-  const sc = MOCK_SCENES[it.name];
+  const sc = sceneOf(it.name);
   const local = t - it.start, active = local >= sc.rest && local <= sc.rest + sc.dur;
   const pose = standingPose(active ? sc.pose((local - sc.rest) / 1000, 1) : {});
   const hands = active && sc.hands ? sc.hands() : [];

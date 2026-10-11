@@ -162,3 +162,51 @@ message (vendor dir renamed, then restored), reactions refused while deciding, c
 (GPU delegate, init 238 ms; 15 fps; CPU image-mode init 140 ms, one inference of both models on a canvas 137 ms; no person in that image so 0 poses). `.wasm` is served as `application/wasm`.
 Console note: MediaPipe prints its own INFO/W lines through console.error/warn (XNNPACK, OpenGL error checking) after Camera is pressed, and the missing-assets probe shows 404s then. Screenshots 25-31.
 **Not verified**: a real camera and real people (pose and hand accuracy, thresholds are educated defaults and need tuning), the Gesture Recognizer on real hands, GPU on real hardware, Firefox/Safari, `http://<LAN-IP>` (shows "needs localhost or https"), a paid "ask" from a real gesture, listening to the boom.
+
+## Copy me (mimic)
+"I want to play with the fly: if we do certain poses, the fly does the same." Switch **Copy me** on (checkbox under the Camera button, default OFF, saved in
+`localStorage` `fly.mimic`), press Camera, stand still for about 1.5 s, then move: the 3D fly copies you. All maths runs in the browser; landmarks never leave the page.
+Status line: `Calibrating: stand still` / `Copying you` / `No body found` / `Paused while the fly works` / `Press Camera so the fly can see you`. Options: **Mirror** (default on),
+**Smoothness** slider (One Euro minimum cutoff 5 Hz * 0.1^s, so 5 Hz .. 0.5 Hz), **Recalibrate**. Sensitivity (Camera actions) scales the dead zones (low 1.5x, normal 1x, high 0.65x).
+
+**Rig and hooks (`web/fly-scene.js`)**: the render-patch hack in `fly.js` was removed. The scene exposes `setFrameHook(fn)` (called every frame with `{dt,t,state,landed}`),
+`setOffsets({dx,dy,yaw,spin,flap,camX})` (additive follow/reaction extras), `setPose(partialRig)`, `setPoseWeight(0..1)`, `getPose()` (smoothed values + weight) and the getters `state`, `landed`, `settled`.
+Rig values are normalised and clamped (contract in `web/fly-mimic.js`: `RIG_SPEC`, `clampRig`, `blendRig`, `smoothRig`, `legAngles`, `wingAngles`, all unit-tested). The scene smooths them (rate 16/s) and
+blends them over its own state-machine look by the pose weight; at weight 0 the old code path is untouched, so thinking/deciding/landing/inconclusive are as before (screenshot 40 vs 03).
+The two FRONT legs are now articulated (hip, upper segment, knee, lower segment, yellow "hand" tip) and slightly thicker and lighter so a raised "arm" reads from camera distance; wings turn to face the viewer when raised.
+Rig keys: `wingL/R` (0 folded, 0.45 straight out, 1 up), `flapL/R`, `legL/R` (front leg raise), `swingL/R` (forearm out/in), `curl`, `legWiggle`, `roll`, `pitch`, `squash` (+ crouch, - stretch), `hop`, `lookX/Y`, `glow`. L/R are SCREEN sides.
+
+| you | fly (mirror on; person's right = screen right) |
+|---|---|
+| wrist (75%) and elbow (25%) height vs shoulder line, in shoulder widths, dead zone 0.12 | that side's front leg raise 0..1 (hand at hip = 0, at shoulder = 0.65, above head = 1) |
+| arm angle from hanging (0 deg) via T (90) to straight up (165); dead zone 28 deg; the WEAKER arm decides 70% so one raised hand moves a leg, not the wings | wings: folded 0 / wide 0.5 / up 1 (min 0.05) |
+| wrist speed | flap amplitude 0.1 .. 0.8 |
+| shoulder-line tilt (65%) and torso offset hips vs shoulders (45%), dead zone 0.1 | `roll` (+ = screen-right side down; sign flips with Mirror off) |
+| shoulder (+hip) drop vs baseline, dead zone 0.2, full at 0.6 sw | crouch: squash up to 1, body lowers 0.4 |
+| rise vs baseline, dead zone 0.12, full at 0.5 sw | hop up to 1 (and stretch -0.6) |
+| shoulder width vs baseline (+-30 %) | `pitch` (low confidence) |
+| nose vs ears | `lookX/lookY` (small) |
+| events: `clap` | wings snap shut 0.25 s then fully open, release after 1.4 s |
+| `wave` (event side) | that front leg up with a 3.5 Hz forearm swing, 2.2 s |
+| `thumbs_up` | a front leg up (event side, else the higher arm) + a 0.8 s glow pulse (slow fade, no flashing) |
+| `peace` | both legs up in a V, 1.8 s |
+| `fist` | legs curl + a small shake (roll), 1.4 s |
+| `open_palm` | wings wide (0.55) and frozen (flap 0), 1.8 s |
+| `point_up` | the fly rises (hop 0.55 + nose up), 1.5 s |
+| `jump` | hop pulse (the continuous signal gives the height) |
+
+**Calibration**: while there is no baseline the status says `Calibrating: stand still`. It needs 1.5 s in which the shoulder line moves <= 0.035 image units and the shoulder width <= 14 %; moving restarts the window.
+It stores the median shoulder height, hip height (if visible) and shoulder width. Arms, lean and wings work before it finishes; crouch/hop/pitch wait for it. If your size in the picture changes more than 22 % (you stepped closer/back) vertical features are
+ignored and after 2 s it recalibrates by itself. **Recalibrate** clears it on demand. Toggling Copy me on starts fresh.
+**Loss and confidence**: shoulders must have visibility >= 0.5. When lost, the last pose is held 300 ms, then it blends to idle and the weight to 0, fully idle at 1.5 s (`No body found`). Weight fades in over 0.4 s and out over 0.5 s, scaled by shoulder visibility.
+**Questions**: the mimic is paused (weight fades out) whenever the scene is not "settled": thinking, listening (voice), the decision flight and the inconclusive spin. It fades back in once the fly has landed (it then copies you in place on the pad) or hovers again.
+Discrete reactions are replaced while Copy me is on: the gesture's own mimic overlay plays instead of a canned `startled/spin/happy/lean` (`flyApi.react('startled'|'happy'|'lean_*')` also maps to overlays; `spin` stays a real spin without wing flap). The attention follow is unchanged and works together with the mimic. Memes are independent and keep their photosensitivity limits.
+**Sound** (optional, level >= 1, mute/ducking honoured): a boing when the hop crosses 0.5 (>= 0.9 s apart), a squeak when a front leg goes above 0.7 (>= 1.2 s apart).
+
+**Mock and debug**: `?cam=mock` with Copy me on plays a dance timeline instead of the gesture tour (stand, right hand, left hand, both hands up, T-pose, lean left/right, squat, jump, clap, wave, thumbs up, peace, fist, open palm, point up) with a caption "Mock pose: ...".
+`window.__flyCamMock.play(name)`, `.freeze(true|false)` (hold the scripted pose), `.danceNames`, `.test(gesture)`. `window.__flyRigDebug()` (only with mock or `?debug=1`) returns the rig the scene shows now plus `weight`, `target` (mimic output), `status`, `calibrated`, `mirror`, `scripted`.
+
+**Tests**: `node --test tests/*.test.js`: 177 pass (157 + 20 in `tests/fly-mimic.test.js`: every mapping, mirror both ways, calibration, jitter, loss decay, confidence fade, smoothing, clamping, events, and 4 mutation checks: mirror flip, roll sign, dead zone, decay timeout).
+Chromium (Playwright, `?cam=mock&mock=1`, no console errors, no horizontal overflow at 390 px): every dance pose moved the matching parameters (right hand -> legR 1 / legL 0, left hand the opposite, mirror toggle flips them, T-pose wings 0.5 + legs 0.6, hands up wings 1 + legs 1, lean left roll -0.65 / lean right +0.65, squat squash 1, jump hop 1,
+clap wings 0 -> 1 -> release, wave swing oscillates, thumbs up glow 0.88, peace V, fist curl 1, open palm wings 0.55 + flap 0, point up hop 0.55). A question run paused the mimic (weight 0 during thinking and the dive, `paused`), decision flight/landing look as in 03, and the mimic faded back in after landing. Screenshots 32-41.
+**Not verified**: a real camera and real pose quality (thresholds, the 28 deg wing dead zone, the lean and crouch scales and the ear-based look are educated defaults from synthetic landmarks; pose-lite jitter is simulated at 0.003), people not standing in front of the camera (seated, partial body), hip visibility on laptops, the boing/squeak sounds by ear, Firefox/Safari, performance on low-end GPUs.
