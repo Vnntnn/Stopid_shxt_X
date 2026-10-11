@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""Contact sheet of every web/memes/png/*.png -> the path given as argument (default docs/fly-ask-screens/32-meme-png-sheet.png)."""
+"""Contact sheet of every web/memes/png/*.png -> the path given as argument (default docs/fly-ask-screens/51-meme-png-sheet.png)."""
 import sys
 from pathlib import Path
 from PIL import Image, ImageDraw
 ROOT = Path(__file__).resolve().parent.parent
 files = sorted((ROOT / 'web' / 'memes' / 'png').glob('*.png'))
-out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'docs' / 'fly-ask-screens' / '32-meme-png-sheet.png'
+out = Path(sys.argv[1]) if len(sys.argv) > 1 else ROOT / 'docs' / 'fly-ask-screens' / '51-meme-png-sheet.png'
 cols, cell = 9, 220
 rows = -(-len(files) // cols)
 sheet = Image.new('RGB', (cols * cell, rows * (cell + 18)), (11, 15, 26))
