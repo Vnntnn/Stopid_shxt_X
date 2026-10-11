@@ -292,6 +292,21 @@ export function createFlyAudio(opts = {}) {
     }
   }
 
+  // Short low "boom" for meme flashes. Level >= 1 only; honours mute, ducking and a hidden tab.
+  function playBoom() {
+    if (!ctx || !master || muted || ducked || !audible() || level < 1) return false;
+    const t0 = ctx.currentTime + 0.01;
+    const o = osc('sine', 150); const gn = gainNode(0.0001);
+    o.frequency.setValueAtTime(150, t0); o.frequency.exponentialRampToValueAtTime(38, t0 + 0.4);
+    envelope(gn.gain, t0, 0.5, 0.01, 0.06, 0.34);
+    link(o, gn, master.bus); o.start(t0);
+    const nz = noiseSource(false); const lp = bp(300, 0.7, 'lowpass'); const ng = gainNode(0.0001);
+    envelope(ng.gain, t0, 0.25, 0.005, 0.02, 0.12);
+    link(nz, lp, ng, master.bus); nz.start(t0);
+    finish([o, nz], t0 + 0.5);
+    return true;
+  }
+
   // ---- fly voice ----
   function shaperCurve() {
     const n = 256, c = new Float32Array(n), k = 12;
@@ -479,6 +494,7 @@ export function createFlyAudio(opts = {}) {
     async playResultVoice(data, o) { const b = await prepareVoice(data); return playVoice(b, o); },
     speakFallback,
     playJingle,
+    playBoom,
     stopVoice,
     stopAll,
     dispose,
