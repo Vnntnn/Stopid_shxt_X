@@ -97,3 +97,68 @@ The Output fly header has a **Cards | Raw JSON** switch (`role="tablist"`, arrow
 - **Code**: pure helpers and 19 tests in `web/fly-json.js` / `tests/fly-json.test.js` (the expanded tokenizer text equals `JSON.stringify(v, null, 2)`, truncation incl. surrogate pairs, collapse helpers, `sessionExport`, `exportFileName`, `byteSize`); view in `fly.js`. Mock: `?xss=1` puts `<script>`/`<img onerror>` in sources, facts and answer; `?big=1` pads the sources; `window.__flyRaw.setRun()` only with `?mock`. `node --test tests/*.test.js`: 74 pass.
 - **Verified in Chromium** (`?mock=1`, `inconclusive`, `ungrounded`, `fail=research`, replay/`from_cache`, real backend with `LLM_PROVIDER=fake`): switching during and after a run, three sub-tabs, fold state kept while events arrive, Copy (confirmation; text equals the tab JSON), Download (anchor `download` name, Blob URL created and revoked), persistence across reload, `<script>` shown as text (no script/img nodes, `window.__xss` unset), keyboard arrows, 1360 / 800 / 390 px with no horizontal page overflow, drawer, no console errors. Screenshots `20`-`24`.
 - **Not verified**: Firefox/Safari, a real LLM run, the real clipboard permission path (the clipboard call was stubbed; the textarea fallback was not exercised).
+
+## Camera, gestures and memes
+Press **Camera** in the "You" panel (next to Text | Voice). A small mirrored preview appears top-left of the stage with the skeleton and hand
+landmarks, fps, mode, the last gesture with its confidence, a red **CAMERA ON** badge and a Stop button. The camera is OFF by default.
+- **Privacy**: everything runs in the browser (MediaPipe WASM + plain JS). No frame is uploaded, recorded or stored; only `audio:false` video is
+  requested (`getUserMedia({video:{width:640,height:480,facingMode:"user"},audio:false})`). The camera stops on Stop, when the tab is hidden, on
+  `pagehide`, or when the device disconnects, and all tracks are released.
+- **Assets** (not in git, 33.7 MB): `sh scripts/fetch_camera_assets.sh` downloads `@mediapipe/tasks-vision@0.10.21` (ESM bundle + 4 wasm/js files),
+  `pose_landmarker_lite.task` (5.8 MB) and `gesture_recognizer.task` (8.4 MB) into `web/vendor/mediapipe/` (git-ignored). POSIX sh, pinned versions,
+  SHA-256 checked, `.part` files then atomic move, idempotent (`--force` re-downloads). They are only requested when Camera is pressed. If they are
+  missing the status says `camera assets missing: run scripts/fetch_camera_assets.sh` and nothing else breaks. If MediaPipe fails to start the
+  page says so and continues in **motion-only** mode (frame-difference energy on an 80x60 canvas -> a low-confidence `wave`).
+- **Pipeline** (`web/fly-cam.js`): vision loop capped at 15 Hz; pose every tick, hand gestures every second tick (GPU delegate, CPU fallback);
+  `web/fly-gestures.js` (pure) turns landmarks + hand labels + motion energy into events with debounce, cooldown and hysteresis.
+- **Fly**: follows the nose (or a single raised hand) with smoothing and a little camera parallax, only while `idle`. Reactions `startled`, `spin`,
+  `happy`, `lean_left/right` through `window.flyApi.react(name)` / `flyApi.setAttention(x,y)`; ignored (not queued) while `deciding`/`landing`
+  (landed included); the follow offset ramps to zero when a run starts. NOTE: `web/fly-scene.js` was not on the allowed-files list, so it is
+  untouched: `fly.js` wraps `THREE.WebGLRenderer.prototype.render` and adds offsets to the fly group the scene recomputes every frame. This is
+  brittle if the scene is restructured (it finds the fly as the scene group with the most children); moving the hooks into the scene is cleaner.
+
+### Gestures (sensitivity low / normal / high; distances in shoulder widths `sw`, times in ms; floor `0.03` image units for any stroke/rise)
+Hand-label gestures (from MediaPipe Gesture Recognizer): thumbs_up, thumbs_down, peace (Victory), open_palm, fist, point_up, i_love_you.
+`side` is the person's own side as shown on the mirrored preview. `nod`/`head_shake` were NOT built: the nose moves about as much as pose-lite jitters.
+| gesture | thresholds (low / normal / high) |
+|---|---|
+| wave | swing 0.35/0.25/0.18; reversals 4/3/2 in 1400 ms; wrist above shoulder line (-0.15/0/+0.2); cooldown 2200/2000/1600 |
+| hands_up | both wrists above nose by 0.4/0.2/0; hold 400/250/150; cooldown 2200/2000/1500 |
+| hand_up_left/right | wrist above nose by 0.4/0.2/0.05, other hand not; hold 500/350/250; sideways range <= 0.15/0.2/0.25 (else it is a wave); cooldown 2200/2000/1500 |
+| t_pose | wrist span 3.6/3.0/2.5; wrists within 0.3/0.4/0.55 of the shoulder line and outside the shoulders; hold 800/600/400; cooldown 3000/2500/2000 |
+| clap | apart >= 1.0/0.8/0.6 then together <= 0.25/0.35/0.45; meetings 3/2/2 in 1800; cooldown 1800/1500/1200 |
+| lean_left/right | nose offset from shoulder centre 0.6/0.45/0.3; hold 500/350/250; re-arm at half; cooldown 1500/1200/900 |
+| jump | upper body rises 0.45/0.3/0.2 within 450 ms, speed 2.2/1.6/1.1 sw/s, shoulder width changes < 20/20/25 %; cooldown 1800/1500/1200 |
+| squat | body below standing level by 0.9/0.65/0.45, held 350/250/150, scale stable; cooldown 3000/2500/2000; blocked 1.2 s after a jump |
+| hand labels | score >= 0.75/0.6/0.45, hold 500/350/200 (open_palm 1000/800/600 because a waving hand is an open palm); cooldown 2000/1500/1200 |
+| motion-only | energy >= 0.08/0.05/0.03 for 700/500/400 ms, no pose for 1 s -> `wave`, confidence <= 0.6; cooldown 3000/2500/2000 |
+An attempt during a cooldown is consumed (leave the pose and come back). Continuous clapping therefore fires about every 1.5 s, by design.
+
+### Actions (collapsible "Camera actions", saved in `localStorage` `fly.cam`)
+Per gesture: [Meme] checkbox + action (Meme only, Fly reaction, Replay voice, Send current question, Pick preset question 1-3, Toggle mute) + **Test**
+(runs the action without a camera; a Test never sends a question, it only reports "dry run"). Defaults: thumbs_up = replay + meme; wave = fly startled + meme;
+jump = fly startled + meme; clap = fly spin + meme; hands_up, peace and the other hand gestures = meme; lean = fly follows (no meme); open_palm = nothing.
+"Send current question" needs the master toggle **Let gestures ask questions (costs money)** (off by default, about $0.007 per fresh question), the gesture held
+0.8 s (the engine raises that gesture's hold) and 10 s between questions; wave/jump/clap carry no hold, so they cannot ask (greyed out). Presets only fill the text box.
+
+### Memes (`web/fly-memes.js`, `web/memes/memes.json`)
+17 gestures, 34 generated cards (e.g. NICE, BRUH, SHEESH, YEET, STONKS, NO WAY, SUS, SKILL ISSUE, GIGACHAD): CSS gradients, impact-style caption, emoji; no
+photos, no trademarked characters. To add your own: copy a file into `web/memes/` (png, jpg, gif, webp, avif, svg) and add
+`{"type":"image","src":"my.gif","caption":"optional"}` under a gesture in `memes.json` (cards: `{"type":"card","caption":"UP TO 28 CHARS","emoji":"x","colorTheme":"ocean","sound":"boom"}`;
+themes sunset ocean grape lime fire ice candy mono gold mint). Bad entries are skipped and listed in the console. **You are responsible for the rights to any image you add.**
+Photosensitivity rules (enforced in code and tests): one meme at a time; one onset per >= 1.2 s globally and at most 2 per 3 s, so never more than 1 flash in any second
+(stress test: 5 x 200,000 hammering attempts, max 1 per 1 s window); a meme lives 1150 ms (shorter than the cooldown); small card, never full-screen, dark/mid colours (luminance and
+contrast tested); images capped at about 40 % of the viewport (240 px floor on phones); nothing blinks or alternates; `prefers-reduced-motion` = plain fade, no scale/rotate, animated
+GIF/WebP shown as first frame only; `pointer-events:none`; caption announced via an `aria-live` region. Optional `boom` sound: level >= 1, honours mute and ducking.
+
+### Mock camera and debug hooks
+`/fly?cam=mock` (add `&mock=1` for the mock backend): scripted pose/hand sequences for every gesture go through the same engine, with a "MOCK CAMERA" badge and a timeline.
+`window.__flyCamDebug()` -> `{running, fps, lastGesture, memesShown, mode, ...}` (only with `?cam=mock`, `?mock` or `?debug=1`); mock also has `window.__flyCamMock.play(name)` / `.test(name)`.
+
+### Tests and verification
+`node --test tests/*.test.js`: 157 pass (74 before; new: fly-gestures 69, fly-memes 10, fly-cam 3, fly-audio +1). Every gesture has a clean positive, a near miss, jitter (sigma 0.004 still fires, 0.003-0.007 on a still person never triggers at any sensitivity) and cooldown tests.
+Chromium (Playwright): every gesture's meme shown in mock mode, fly reactions, actions panel, no console errors at 1360/800/390 px (no horizontal overflow), reduced-motion (`meme static`, fade only), assets-missing
+message (vendor dir renamed, then restored), reactions refused while deciding, camera tracks `ended` after Stop. **Real MediaPipe**: with a canvas `captureStream` standing in for the camera, both models loaded and ran
+(GPU delegate, init 238 ms; 15 fps; CPU image-mode init 140 ms, one inference of both models on a canvas 137 ms; no person in that image so 0 poses). `.wasm` is served as `application/wasm`.
+Console note: MediaPipe prints its own INFO/W lines through console.error/warn (XNNPACK, OpenGL error checking) after Camera is pressed, and the missing-assets probe shows 404s then. Screenshots 25-31.
+**Not verified**: a real camera and real people (pose and hand accuracy, thresholds are educated defaults and need tuning), the Gesture Recognizer on real hands, GPU on real hardware, Firefox/Safari, `http://<LAN-IP>` (shows "needs localhost or https"), a paid "ask" from a real gesture, listening to the boom.
