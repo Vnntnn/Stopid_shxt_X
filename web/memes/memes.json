@@ -1,282 +1,107 @@
 {
- "_comment": "Gesture -> list of meme entries. type \"card\" = generated card (caption up to 28 chars, optional emoji). type \"image\" = a file you drop into web/memes/ (src is relative to this folder; png/jpg/gif/webp/avif/svg). colorTheme: sunset ocean grape lime fire ice candy mono gold mint. sound: boom or none. You are responsible for the rights to any image you add.",
- "thumbs_up": [
-  {
-   "type": "card",
-   "caption": "NICE",
-   "emoji": "👍",
-   "colorTheme": "ocean",
-   "sound": "boom"
-  },
-  {
-   "type": "card",
-   "caption": "BIG W",
-   "emoji": "🏆",
-   "colorTheme": "gold",
-   "sound": "none"
-  }
- ],
- "thumbs_down": [
-  {
-   "type": "card",
-   "caption": "BRUH",
-   "emoji": "😐",
-   "colorTheme": "mono",
-   "sound": "boom"
-  },
-  {
-   "type": "card",
-   "caption": "BIG L",
-   "emoji": "📉",
-   "colorTheme": "fire",
-   "sound": "none"
-  }
- ],
- "wave": [
-  {
-   "type": "card",
-   "caption": "SHEESH",
-   "emoji": "🥶",
-   "colorTheme": "ice",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "HIIII",
-   "emoji": "👋",
-   "colorTheme": "candy",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "WOW",
-   "emoji": "🤯",
-   "colorTheme": "grape",
-   "sound": "none"
-  }
+ "_comment": "Gesture -> list of meme entries; \"any\" = usable by every gesture. type \"image\": src is relative to web/memes/ (png/jpg/webp/avif/svg), caption is read out by screen readers, sound: none boom airhorn bruh violin scratch ding buzzer wow, optional centered/noJitter. type \"card\": a text-only fallback card (caption up to 28 chars, no emoji). A missing file is skipped silently. Regenerate the starter PNGs with scripts/make_meme_pngs.py (captions in web/memes/captions.js). You are responsible for the rights to any image you add; web/memes/images/ is git-ignored.",
+ "jump": [
+  {"type": "image", "src": "png/siuuuu.png", "caption": "SIUUUU", "sound": "airhorn"},
+  {"type": "image", "src": "png/lets-goooo.png", "caption": "LET'S GOOOO", "sound": "airhorn"},
+  {"type": "image", "src": "png/th-wow-sa.png", "caption": "ว้าวซ่า", "sound": "wow"},
+  {"type": "image", "src": "png/fly-high.png", "caption": "FLY HIGH", "sound": "wow"}
  ],
  "hands_up": [
-  {
-   "type": "card",
-   "caption": "STONKS",
-   "emoji": "📈",
-   "colorTheme": "lime",
-   "sound": "boom"
-  },
-  {
-   "type": "card",
-   "caption": "LET'S GO",
-   "emoji": "🔥",
-   "colorTheme": "fire",
-   "sound": "none"
-  }
- ],
- "hand_up_left": [
-  {
-   "type": "card",
-   "caption": "PICK ME",
-   "emoji": "🙋",
-   "colorTheme": "sunset",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "OBJECTION",
-   "emoji": "☝️",
-   "colorTheme": "mono",
-   "sound": "none"
-  }
- ],
- "hand_up_right": [
-  {
-   "type": "card",
-   "caption": "PICK ME",
-   "emoji": "🙋",
-   "colorTheme": "ocean",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "QUESTION?",
-   "emoji": "❓",
-   "colorTheme": "grape",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/lets-goooo.png", "caption": "LET'S GOOOO", "sound": "airhorn"},
+  {"type": "image", "src": "png/th-pang-mak.png", "caption": "ปังมาก", "sound": "ding"},
+  {"type": "image", "src": "png/gg-ez.png", "caption": "GG EZ", "sound": "boom"},
+  {"type": "image", "src": "png/six-seven.png", "caption": "SIX SEVEN", "sound": "boom"}
  ],
  "t_pose": [
-  {
-   "type": "card",
-   "caption": "GIGACHAD",
-   "emoji": "🗿",
-   "colorTheme": "mono",
-   "sound": "boom"
-  },
-  {
-   "type": "card",
-   "caption": "DOMINANCE",
-   "emoji": "💪",
-   "colorTheme": "gold",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/t-pose.png", "caption": "T-POSE TO ASSERT DOMINANCE", "sound": "boom"},
+  {"type": "image", "src": "png/plus-1000-aura.png", "caption": "+1000 AURA", "sound": "ding"},
+  {"type": "image", "src": "png/lock-in.png", "caption": "LOCK IN", "sound": "boom"}
  ],
  "clap": [
-  {
-   "type": "card",
-   "caption": "BRAVO",
-   "emoji": "👏",
-   "colorTheme": "candy",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "NICE",
-   "emoji": "✨",
-   "colorTheme": "mint",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/gg-ez.png", "caption": "GG EZ", "sound": "ding"},
+  {"type": "image", "src": "png/th-55555.png", "caption": "555555", "sound": "boom"},
+  {"type": "image", "src": "png/th-ngan-di.png", "caption": "งานดี", "sound": "ding"},
+  {"type": "image", "src": "png/bark.png", "caption": "BARK", "sound": "boom"}
  ],
- "lean_left": [
-  {
-   "type": "card",
-   "caption": "SUS",
-   "emoji": "🕵️",
-   "colorTheme": "lime",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "SIDE EYE",
-   "emoji": "👀",
-   "colorTheme": "mono",
-   "sound": "none"
-  }
+ "wave": [
+  {"type": "image", "src": "png/sheesh.png", "caption": "SHEESH", "sound": "wow"},
+  {"type": "image", "src": "png/hello.png", "caption": "HELLO??", "sound": "boom"},
+  {"type": "image", "src": "png/bzzzz.png", "caption": "BZZZZ", "sound": "wow"}
  ],
- "lean_right": [
-  {
-   "type": "card",
-   "caption": "SUS",
-   "emoji": "🕵️",
-   "colorTheme": "fire",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "SIDE EYE",
-   "emoji": "👀",
-   "colorTheme": "grape",
-   "sound": "none"
-  }
+ "thumbs_up": [
+  {"type": "image", "src": "png/plus-1000-aura.png", "caption": "+1000 AURA", "sound": "ding"},
+  {"type": "image", "src": "png/th-pang-mak.png", "caption": "ปังมาก", "sound": "ding"},
+  {"type": "image", "src": "png/based.png", "caption": "BASED", "sound": "boom"},
+  {"type": "image", "src": "png/rizz-max.png", "caption": "RIZZ MAX", "sound": "ding"},
+  {"type": "image", "src": "png/no-cap.png", "caption": "NO CAP FR FR", "sound": "boom"}
  ],
- "jump": [
-  {
-   "type": "card",
-   "caption": "YEET",
-   "emoji": "🚀",
-   "colorTheme": "sunset",
-   "sound": "boom"
-  },
-  {
-   "type": "card",
-   "caption": "NO WAY",
-   "emoji": "😱",
-   "colorTheme": "fire",
-   "sound": "boom"
-  }
- ],
- "squat": [
-  {
-   "type": "card",
-   "caption": "SKILL ISSUE",
-   "emoji": "🧠",
-   "colorTheme": "grape",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "LEG DAY",
-   "emoji": "🦵",
-   "colorTheme": "lime",
-   "sound": "none"
-  }
+ "thumbs_down": [
+  {"type": "image", "src": "images/son/son-son-meme.png", "caption": "Son", "sound": "violin"},
+  {"type": "image", "src": "png/bruh.png", "caption": "BRUH", "sound": "bruh"},
+  {"type": "image", "src": "png/l-ratio.png", "caption": "L + RATIO", "sound": "buzzer"},
+  {"type": "image", "src": "png/minus-1000-aura.png", "caption": "-1000 AURA", "sound": "buzzer"}
  ],
  "peace": [
-  {
-   "type": "card",
-   "caption": "PEACE",
-   "emoji": "✌️",
-   "colorTheme": "mint",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "CHILL",
-   "emoji": "😎",
-   "colorTheme": "ocean",
-   "sound": "none"
-  }
- ],
- "open_palm": [
-  {
-   "type": "card",
-   "caption": "STOP",
-   "emoji": "✋",
-   "colorTheme": "fire",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "TALK TO THE HAND",
-   "emoji": "🖐️",
-   "colorTheme": "mono",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/sigma.png", "caption": "SIGMA", "sound": "boom"},
+  {"type": "image", "src": "png/peace.png", "caption": "PEACE", "sound": "ding"},
+  {"type": "image", "src": "png/th-jueng-a.png", "caption": "จึ้งอ่ะ", "sound": "ding"},
+  {"type": "image", "src": "png/delulu.png", "caption": "DELULU IS THE SOLULU", "sound": "wow"}
  ],
  "fist": [
-  {
-   "type": "card",
-   "caption": "BONK",
-   "emoji": "🔨",
-   "colorTheme": "gold",
-   "sound": "boom"
-  },
-  {
-   "type": "card",
-   "caption": "PUNCH",
-   "emoji": "👊",
-   "colorTheme": "fire",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/cooked.png", "caption": "COOKED", "sound": "boom"},
+  {"type": "image", "src": "png/crashout.png", "caption": "CRASHOUT", "sound": "buzzer"},
+  {"type": "image", "src": "png/th-teung-mak.png", "caption": "ตึงมาก", "sound": "boom"},
+  {"type": "image", "src": "png/sus.png", "caption": "SUS", "sound": "bruh"}
  ],
  "point_up": [
-  {
-   "type": "card",
-   "caption": "ACTUALLY",
-   "emoji": "☝️",
-   "colorTheme": "ocean",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "BIG BRAIN",
-   "emoji": "🧠",
-   "colorTheme": "candy",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/well-actually.png", "caption": "WELL ACTUALLY", "sound": "scratch"},
+  {"type": "image", "src": "png/th-tam-noi.png", "caption": "ถามหน่อย", "sound": "scratch"},
+  {"type": "image", "src": "png/no-cap.png", "caption": "NO CAP FR FR", "sound": "scratch"},
+  {"type": "image", "src": "png/th-arai-khong-ther.png", "caption": "อะไรของเธอ", "sound": "scratch"}
+ ],
+ "open_palm": [
+  {"type": "image", "src": "png/talk-to-the-hand.png", "caption": "TALK TO THE HAND", "sound": "scratch"},
+  {"type": "image", "src": "png/th-jai-yen.png", "caption": "ใจเย็นๆ", "sound": "none"},
+  {"type": "image", "src": "png/touch-grass.png", "caption": "TOUCH GRASS", "sound": "bruh"}
  ],
  "i_love_you": [
-  {
-   "type": "card",
-   "caption": "WHOLESOME",
-   "emoji": "🥹",
-   "colorTheme": "candy",
-   "sound": "none"
-  },
-  {
-   "type": "card",
-   "caption": "LOVE IT",
-   "emoji": "🤟",
-   "colorTheme": "sunset",
-   "sound": "none"
-  }
+  {"type": "image", "src": "png/th-fin-wer.png", "caption": "ฟินเว่อร์", "sound": "ding"},
+  {"type": "image", "src": "png/rock-on.png", "caption": "ROCK ON", "sound": "airhorn"},
+  {"type": "image", "src": "png/th-kheen-a.png", "caption": "เขินอ่ะ", "sound": "ding"},
+  {"type": "image", "src": "png/delulu.png", "caption": "DELULU IS THE SOLULU", "sound": "wow"}
+ ],
+ "squat": [
+  {"type": "image", "src": "png/skill-issue.png", "caption": "SKILL ISSUE", "sound": "buzzer"},
+  {"type": "image", "src": "png/th-mai-wai-laeo.png", "caption": "ไม่ไหวแล้ววว", "sound": "violin"},
+  {"type": "image", "src": "images/son/son-son-meme.png", "caption": "Son", "sound": "violin"},
+  {"type": "image", "src": "png/th-tai-laeo.png", "caption": "ตายแล้ว", "sound": "bruh"}
+ ],
+ "lean_left": [
+  {"type": "image", "src": "png/mewing.png", "caption": "MEWING", "sound": "wow"},
+  {"type": "image", "src": "png/npc-moment.png", "caption": "NPC MOMENT", "sound": "bruh"},
+  {"type": "image", "src": "png/lock-in.png", "caption": "LOCK IN", "sound": "none"}
+ ],
+ "lean_right": [
+  {"type": "image", "src": "png/mewing.png", "caption": "MEWING", "sound": "wow"},
+  {"type": "image", "src": "png/npc-moment.png", "caption": "NPC MOMENT", "sound": "bruh"},
+  {"type": "image", "src": "png/fly-has-spoken.png", "caption": "THE FLY HAS SPOKEN", "sound": "boom"}
+ ],
+ "hand_up_left": [
+  {"type": "image", "src": "png/th-tam-noi.png", "caption": "ถามหน่อย", "sound": "scratch"},
+  {"type": "image", "src": "png/im-a-let-you-finish.png", "caption": "I'MA LET YOU FINISH BUT THE FLY HAD THE BEST ANSWER OF ALL TIME", "sound": "scratch"},
+  {"type": "image", "src": "png/th-laew-ngai-tor.png", "caption": "แล้วไงต่อ", "sound": "bruh"}
+ ],
+ "hand_up_right": [
+  {"type": "image", "src": "png/th-tam-noi.png", "caption": "ถามหน่อย", "sound": "scratch"},
+  {"type": "image", "src": "png/im-a-let-you-finish.png", "caption": "I'MA LET YOU FINISH BUT THE FLY HAD THE BEST ANSWER OF ALL TIME", "sound": "scratch"},
+  {"type": "image", "src": "png/only-in-ohio.png", "caption": "ONLY IN OHIO", "sound": "bruh"},
+  {"type": "image", "src": "png/hood-classic.png", "caption": "HOOD CLASSIC", "sound": "boom"}
+ ],
+ "belly_rub": [
+  {"type": "image", "src": "png/belly-man.png", "caption": "Pregnant man", "sound": "wow", "centered": true, "noJitter": true}
+ ],
+ "any": [
+  {"type": "image", "src": "images/son/images.jpg", "caption": "Son?", "sound": "violin"},
+  {"type": "image", "src": "images/son/imagescharlie.jpg", "caption": "son", "sound": "violin"}
  ]
 }
