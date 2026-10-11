@@ -6,7 +6,7 @@ import { tokenizeJson, sessionExport, exportFileName, byteSize, formatBytes, mak
 import { createMimic, RIG_KEYS } from '/static/fly-mimic.js';
 import { createCamera } from '/static/fly-cam.js';
 import { createGestureEngine, GESTURES, GESTURE_TITLES, SENSITIVITIES, ACTION_TYPES, ACTION_LABELS, defaultActionsConfig, normalizeActionsConfig, planAction, requiredHolds, ASK_COOLDOWN_MS } from '/static/fly-gestures.js';
-import { createMemeOverlay, parseManifest, FALLBACK_MANIFEST } from '/static/fly-memes.js';
+import { createMemeOverlay, parseManifest, FALLBACK_MANIFEST, normSpeed, SPEEDS, createUserMemeStore, classifyFile, WILDCARD, USER_LIMITS } from '/static/fly-memes.js';
 import { hostnameOf, formatCost, formatPct, formatSeconds, clampText, safeHttpUrl, deriveChecks } from '/static/fly-format.js';
 
 const $ = (id) => document.getElementById(id);
@@ -1139,9 +1139,12 @@ try { camCfg = normalizeActionsConfig(JSON.parse(localStorage.getItem(CAM_KEY) |
 function saveCamCfg() { try { localStorage.setItem(CAM_KEY, JSON.stringify(camCfg)); } catch (_) { /* ignore */ } }
 const PRESETS = ['ระหว่างพรรคของคุณพิธากับพรรคของเสี่ยหนู ใครจะชนะ?', "Who is ahead in the latest polls: the People's Party or Bhumjaithai?", 'ใครจะได้เป็นนายกรัฐมนตรีคนต่อไป?'];
 
-// ---- Memes ----
+// ---- Memes (PNG slaps) ----
+const MEME_SPEED_KEY = 'fly.memeSpeed';
+let memeSpeed = 'normal';
+try { memeSpeed = normSpeed(localStorage.getItem(MEME_SPEED_KEY)); } catch (_) { /* storage blocked: Normal */ }
 let memeManifest = FALLBACK_MANIFEST;
-const memes = createMemeOverlay({ layer: $('meme-layer'), live: $('meme-live'), byGesture: memeManifest, reduced, audio: engine });
+const memes = createMemeOverlay({ layer: $('meme-layer'), live: $('meme-live'), byGesture: memeManifest, reduced, audio: engine, speed: memeSpeed });
 (async () => {
   try {
     const res = await fetch('/static/memes/memes.json', { cache: 'no-cache' });
@@ -1150,7 +1153,95 @@ const memes = createMemeOverlay({ layer: $('meme-layer'), live: $('meme-live'), 
     if (parsed.count > 0) { memeManifest = parsed.byGesture; memes.setManifest(memeManifest); }
     if (parsed.errors.length) console.warn('memes.json:', parsed.errors.join('; '));
   } catch (_) { /* built-in fallback cards are used */ }
+  (window.requestIdleCallback || ((f) => setTimeout(f, 200)))(() => memes.preload()); // decode the PNGs in the background so the first slap is instant
 })();
+$('meme-speed').value = memeSpeed;
+$('meme-speed').addEventListener('change', () => {
+  memeSpeed = normSpeed($('meme-speed').value); memes.setSpeed(memeSpeed);
+  try { localStorage.setItem(MEME_SPEED_KEY, memeSpeed); } catch (_) { /* ignore */ }
+});
+
+// ---- Your own memes: drop files on the page or press "Add memes". Stored in IndexedDB in this browser only; nothing is uploaded. ----
+let idbPromise = null;
+const idb = () => idbPromise || (idbPromise = new Promise((resolve, reject) => {
+  try {
+    const r = indexedDB.open('fly-memes', 1);
+    r.onupgradeneeded = () => { r.result.createObjectStore('memes', { keyPath: 'id' }); };
+    r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+  } catch (e) { reject(e); }
+}));
+const idbReq = (mode, fn) => idb().then((db) => new Promise((resolve, reject) => { const tx = db.transaction('memes', mode); const rq = fn(tx.objectStore('memes')); tx.oncomplete = () => resolve(rq && rq.result); tx.onerror = tx.onabort = () => reject(tx.error); }));
+const userStore = createUserMemeStore({ getAll: () => idbReq('readonly', (st) => st.getAll()), put: (rec) => idbReq('readwrite', (st) => st.put(rec)), delete: (id) => idbReq('readwrite', (st) => st.delete(id)) });
+let allowMediaMemes = false, userUrls = [];
+const userStatus = (t) => { $('meme-user-status').textContent = t || ''; };
+function refreshUserMemes() {
+  for (const u of userUrls) { try { URL.revokeObjectURL(u); } catch (_) { /* ignore */ } }
+  userUrls = [];
+  const urlFor = (rec) => { const u = URL.createObjectURL(rec.blob); userUrls.push(u); return u; };
+  memes.setAllowMedia(allowMediaMemes);
+  memes.setUserEntries(userStore.toEntries(urlFor, { allowMedia: allowMediaMemes }));
+  memes.preload();
+  const box = $('meme-thumbs'); box.textContent = '';
+  for (const rec of userStore.list()) {
+    const th = el('div', 'meme-thumb'); th.title = `${rec.name} - ${rec.gestures.map((g) => GESTURE_TITLES[g] || 'Any gesture').join(', ')}`;
+    if (rec.kind === 'image') { const im = el('img'); im.alt = rec.name; im.src = URL.createObjectURL(rec.blob); userUrls.push(im.src); th.append(im); } else th.append(el('div', 'clip', rec.kind));
+    const del = el('button', '', '\u00d7'); del.type = 'button'; del.setAttribute('aria-label', `Delete meme ${rec.name}`);
+    del.addEventListener('click', async () => { const r = await userStore.remove(rec.id); userStatus(r.ok ? `Deleted ${rec.name}.` : `Could not delete: ${r.reason}`); refreshUserMemes(); });
+    th.append(del); box.append(th);
+  }
+}
+userStore.load().then((r) => { if (!r.ok) userStatus('Your own memes cannot be stored in this browser (storage is blocked).'); refreshUserMemes(); });
+let pendingFiles = [];
+function buildMemeDialog() {
+  const list = $('meme-glist'); list.textContent = '';
+  for (const g of GESTURES) { const lab = el('label', 'check'); const cb = el('input'); cb.type = 'checkbox'; cb.value = g; cb.disabled = true; lab.append(cb, document.createTextNode(GESTURE_TITLES[g] || g)); list.append(lab); }
+  $('meme-any').addEventListener('change', () => { for (const cb of list.querySelectorAll('input')) { cb.disabled = $('meme-any').checked; if ($('meme-any').checked) cb.checked = false; } });
+}
+buildMemeDialog();
+function offerFiles(files) {
+  const ok = [], bad = [];
+  let count = userStore.count;
+  for (const f of files) { const c = classifyFile(f, { allowMedia: allowMediaMemes, count }); if (c.ok) { ok.push(f); count++; } else bad.push(`${f.name}: ${c.reason}`); }
+  if (bad.length) userStatus(`Skipped ${bad.length}: ${bad.slice(0, 3).join('; ')}`);
+  if (!ok.length) return;
+  pendingFiles = ok;
+  $('meme-dialog-files').textContent = ok.length === 1 ? ok[0].name : `${ok.length} files: ${ok.slice(0, 3).map((f) => f.name).join(', ')}${ok.length > 3 ? ', ...' : ''}`;
+  $('meme-any').checked = true; $('meme-any').dispatchEvent(new Event('change'));
+  const d = $('meme-dialog');
+  if (d.showModal) d.showModal(); else d.setAttribute('open', '');
+}
+$('meme-cancel').addEventListener('click', () => { pendingFiles = []; $('meme-dialog').close(); });
+$('meme-dialog-form').addEventListener('submit', async () => {
+  const picked = $('meme-any').checked ? [WILDCARD] : [...$('meme-glist').querySelectorAll('input:checked')].map((cb) => cb.value);
+  let added = 0; const fails = [];
+  for (const f of pendingFiles) { const r = await userStore.add(f, picked, { allowMedia: allowMediaMemes }); if (r.ok) added++; else fails.push(`${f.name}: ${r.reason}`); }
+  pendingFiles = [];
+  userStatus(`Added ${added} meme${added === 1 ? '' : 's'}.${fails.length ? ' Skipped: ' + fails.slice(0, 2).join('; ') : ''}`);
+  refreshUserMemes();
+});
+$('meme-add').addEventListener('click', () => $('meme-file').click());
+$('meme-file').addEventListener('change', () => { offerFiles([...$('meme-file').files]); $('meme-file').value = ''; });
+$('meme-media').addEventListener('change', () => {
+  allowMediaMemes = $('meme-media').checked;
+  $('meme-media-warn').hidden = !allowMediaMemes;
+  $('meme-file').accept = allowMediaMemes ? 'image/png,image/jpeg,image/webp,image/gif,video/mp4,video/webm,audio/mpeg,audio/ogg,audio/wav' : 'image/png,image/jpeg,image/webp';
+  if (allowMediaMemes && reduced) userStatus('Reduced motion is on: GIF and video memes will not be shown.');
+  refreshUserMemes();
+});
+$('meme-export').addEventListener('click', () => {
+  const blob = new Blob([JSON.stringify(userStore.exportManifest(), null, 2)], { type: 'application/json' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'fly-memes-manifest.json'; document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+});
+{
+  let hint = null, depth = 0;
+  const hasFiles = (e) => e.dataTransfer && [...(e.dataTransfer.types || [])].includes('Files');
+  addEventListener('dragenter', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth++; if (!hint) { hint = el('div', 'meme-drop-hint', 'Drop memes here (PNG, JPG, WebP)'); document.body.append(hint); } });
+  addEventListener('dragover', (e) => { if (hasFiles(e)) e.preventDefault(); });
+  addEventListener('dragleave', (e) => { if (!hasFiles(e)) return; depth = Math.max(0, depth - 1); if (!depth && hint) { hint.remove(); hint = null; } });
+  addEventListener('drop', (e) => { if (!hasFiles(e)) return; e.preventDefault(); depth = 0; if (hint) { hint.remove(); hint = null; } offerFiles([...e.dataTransfer.files]); });
+}
+void USER_LIMITS; void SPEEDS;
 
 // ---- Gesture -> action ----
 const camEngine = createGestureEngine({ sensitivity: camCfg.sensitivity });
@@ -1289,6 +1380,7 @@ applyCamCfg(false);
 if (camMock || params.has('mock') || params.get('debug') === '1') {
   window.__flyCamDebug = () => ({ running: cam.running, fps: cam.state.fps, lastGesture: camLastInfo, memesShown: memes.shown, mode: cam.state.mode, message: cam.state.message, frames: cam.state.frames, delegate: cam.state.delegate || null, initMs: cam.state.initMs || null });
   window.__flyApi = flyApi;
+  window.__flyMemes = { overlay: memes, store: userStore, offerFiles };
   if (camMock) window.__flyCamMock = { play: (n) => cam.mockPlay(n), names: mockMod.MOCK_ORDER.slice(), freeze: (b) => cam.mockFreeze(b), danceNames: mockMod.DANCE_ORDER.slice(), test: (n) => onGesture({ name: n, confidence: 1, ts: performance.now(), test: true }, true) };
 }
 

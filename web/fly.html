@@ -108,8 +108,24 @@
         </div>
         <label class="check cam-ask"><input type="checkbox" id="cam-ask"> Let gestures ask questions (costs money)</label>
         <p class="cam-hint" id="cam-ask-hint">Every fresh question costs about $0.007. Needs the gesture held 0.8 s, at most one question per 10 s. Off by default.</p>
+        <div class="cam-opt">
+          <label for="meme-speed">Meme speed</label>
+          <select id="meme-speed"><option value="normal" selected>Normal (1 s, gap 1.2 s)</option><option value="fast">Fast (0.75 s, gap 0.8 s)</option><option value="ultra">ULTRA (0.55 s, gap 0.5 s)</option></select>
+        </div>
         <div class="cam-rows" id="cam-rows" role="list"></div>
-        <p class="cam-hint">Memes flash at most about once a second. Test buttons run the action without the camera (a question is never sent from Test).</p>
+        <p class="cam-hint">A meme is one still picture slapped on the screen for about a second. There are never more than 2 per second, at any speed. Test buttons run the action without the camera (a question is never sent from Test).</p>
+        <div class="meme-user-opts">
+          <div class="cam-opt">
+            <button type="button" class="mini" id="meme-add">Add memes</button>
+            <button type="button" class="mini" id="meme-export" title="Download the list of your memes as JSON, without the files">Export manifest</button>
+            <input type="file" id="meme-file" accept="image/png,image/jpeg,image/webp" multiple hidden>
+          </div>
+          <p class="cam-hint" id="meme-user-hint">Drop PNG, JPG or WebP files anywhere on the page (max 40 files, 2 MB each). They stay in this browser and are never uploaded.</p>
+          <label class="check"><input type="checkbox" id="meme-media"> Also allow GIF / video / audio memes</label>
+          <p class="meme-warn" id="meme-media-warn" hidden>Warning: moving clips can flash and may trigger seizures in people with photosensitive epilepsy. Clips are cut after 1.5 s and count towards the same limit, but only turn this on if you know it is safe for everyone watching.</p>
+          <p class="cam-hint" id="meme-user-status" role="status" aria-live="polite"></p>
+          <div class="meme-thumbs" id="meme-thumbs"></div>
+        </div>
       </div>
     </details>
   </section>
@@ -176,5 +192,14 @@
   </section>
 </main>
 <script type="module" src="/static/fly.js"></script>
+  <dialog class="meme-dialog" id="meme-dialog" aria-labelledby="meme-dialog-title">
+    <form method="dialog" id="meme-dialog-form">
+      <h2 id="meme-dialog-title" style="font-size:1rem;margin:0 0 4px">Which gestures show this meme?</h2>
+      <p class="cam-hint" id="meme-dialog-files"></p>
+      <label class="check"><input type="checkbox" id="meme-any" checked> Any gesture</label>
+      <div class="g-list" id="meme-glist"></div>
+      <div class="row"><button type="button" class="mini" id="meme-cancel">Cancel</button><button type="submit" class="mini" id="meme-save" value="save">Add</button></div>
+    </form>
+  </dialog>
 </body>
 </html>
