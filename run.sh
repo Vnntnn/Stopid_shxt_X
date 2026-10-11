@@ -24,7 +24,8 @@ fi
 
 command -v ngrok >/dev/null || { echo "ngrok not found: brew install ngrok && ngrok config add-authtoken <token>"; exit 1; }
 export ONFLY_ALLOWED_HOSTS="${ONFLY_ALLOWED_HOSTS:-*.ngrok-free.app,*.ngrok-free.dev,*.ngrok.app,*.ngrok.io}"
-.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port "$PORT" &
+# ngrok owns the terminal, so the server logs go to a file: tail -f .runtime-server.log
+.venv/bin/python -m uvicorn app:app --host 127.0.0.1 --port "$PORT" > .runtime-server.log 2>&1 &
 SERVER=$!
 trap 'kill $SERVER 2>/dev/null' EXIT INT TERM
 if [ -n "${TUNNEL_AUTH:-}" ]; then
