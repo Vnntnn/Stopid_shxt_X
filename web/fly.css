@@ -343,3 +343,17 @@ button.jmore-lines { margin: 6px; }
   .meme.show.leaving { animation: meme-fade-out .25s linear forwards; }
   .meme { transform: none; }
 }
+
+/* ---- Copy me (mimic) ---- */
+.mimic { margin-top: 10px; border-top: 1px solid var(--line); padding-top: 8px; display: grid; gap: 6px; }
+.mimic-main { display: flex; font-size: 13.5px; color: var(--text); align-items: center; gap: 6px; flex-wrap: wrap; }
+.mimic-sub { color: var(--muted); font-size: 12px; }
+.mimic-status { font-size: 12.5px; color: var(--muted); min-height: 1.2em; }
+.mimic-status.on { color: #8dffc4; }
+.mimic-status.warn { color: #ffd479; }
+.mimic-opts { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12.5px; color: var(--muted); }
+.mimic-opts[hidden] { display: none; }
+.mimic-smooth { display: inline-flex; align-items: center; gap: 6px; }
+.mimic-smooth input { width: 110px; }
+.mock-caption { position: absolute; left: 50%; bottom: 62px; transform: translateX(-50%); z-index: 4; background: rgba(8,10,24,.82); border: 1.5px solid var(--line); border-radius: 999px; padding: 4px 14px; font-size: 13px; font-weight: 600; color: #ffe14d; pointer-events: none; white-space: nowrap; max-width: calc(100% - 24px); overflow: hidden; text-overflow: ellipsis; }
+.mock-caption[hidden] { display: none; }

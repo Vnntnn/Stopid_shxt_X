@@ -39,6 +39,7 @@
       <ol class="cam-timeline" id="cam-timeline" hidden aria-label="Mock camera timeline"></ol>
       <div class="cam-note">Runs in this browser. Nothing is uploaded or saved.</div>
     </div>
+    <div class="mock-caption" id="mock-caption" hidden role="status"></div>
     <div class="meme-layer" id="meme-layer"><span class="sr-only" id="meme-live" role="status" aria-live="polite"></span></div>
   </div>
   <div class="badge-state" id="fly-state" aria-hidden="true">idle</div>
@@ -89,6 +90,15 @@
       </div>
     </div>
 
+    <div class="mimic" id="mimic" role="group" aria-label="Copy me">
+      <label class="check mimic-main"><input type="checkbox" id="mimic-on"> <b>Copy me</b> <span class="mimic-sub">the fly copies your pose</span></label>
+      <span class="mimic-status" id="mimic-status" role="status" aria-live="polite"></span>
+      <div class="mimic-opts" id="mimic-opts" hidden>
+        <label class="check"><input type="checkbox" id="mimic-mirror" checked> Mirror</label>
+        <label class="mimic-smooth" for="mimic-smooth">Smoothness <input type="range" id="mimic-smooth" min="0" max="100" step="5" value="50"></label>
+        <button type="button" class="mini" id="mimic-recal" title="Stand still for a moment to measure your standing height again">Recalibrate</button>
+      </div>
+    </div>
     <details class="cam-actions" id="cam-actions">
       <summary>Camera actions</summary>
       <div class="cam-actions-body">

@@ -3,7 +3,7 @@ import { createScene } from '/static/fly-scene.js';
 import { createFlyAudio } from '/static/fly-audio.js';
 import { flySpeech } from '/static/fly-speak.js';
 import { tokenizeJson, sessionExport, exportFileName, byteSize, formatBytes, makeEventRecord, collapseState, toggleCollapsed, collapseAll, expandAll, allCollapsed, LARGE_BYTES } from '/static/fly-json.js';
-import * as THREE from 'three';
+import { createMimic, RIG_KEYS } from '/static/fly-mimic.js';
 import { createCamera } from '/static/fly-cam.js';
 import { createGestureEngine, GESTURES, GESTURE_TITLES, SENSITIVITIES, ACTION_TYPES, ACTION_LABELS, defaultActionsConfig, normalizeActionsConfig, planAction, requiredHolds, ASK_COOLDOWN_MS } from '/static/fly-gestures.js';
 import { createMemeOverlay, parseManifest, FALLBACK_MANIFEST } from '/static/fly-memes.js';
@@ -1035,26 +1035,51 @@ addEventListener('pagehide', () => { if (rec.active) stopRecording(true); });
 // Camera: gestures, memes and the fly's reactions. Everything is local; the camera is off until the button is pressed.
 // =====================================================================================================
 
-// ---- Fly rig: follow + reactions, layered on top of the scene without touching fly-scene.js ----
-// The scene recomputes the fly's position every frame before it renders, so offsets added here never accumulate.
-const rig = { fly: null, wings: [], follow: 0, cur: { x: 0, y: 0 }, target: { x: 0, y: 0, on: false, at: 0 }, rx: null, last: performance.now() };
+// ---- Fly rig: follow, reactions and "Copy me", driven through the scene's explicit hooks (scene.setFrameHook / setOffsets / setPose) ----
+const rig = { follow: 0, cur: { x: 0, y: 0 }, target: { x: 0, y: 0, on: false, at: 0 }, rx: null };
 const smooth01 = (x) => { x = Math.min(1, Math.max(0, x)); return x * x * (3 - 2 * x); };
-function findFly(sc) {
-  let best = null;
-  for (const o of sc.children) if (o.isGroup && (!best || o.children.length > best.children.length)) best = o;
-  if (!best || best.children.length < 15) return null;
-  rig.wings = best.children.filter((c) => c.isGroup && c.children.length === 1 && c.children[0].isMesh && Math.abs(Math.abs(c.position.x) - 0.3) < 1e-3 && Math.abs(c.position.y - 0.4) < 1e-3);
-  return best;
-}
 const REACTIONS = { startled: 1.3, spin: 1.0, happy: 1.5, lean_left: 1.6, lean_right: 1.6 };
-function rigFrame(sc, cam) {
+
+// ---- Copy me (mimic): the fly copies the user's pose. Pose landmarks stay in this page; nothing is uploaded or stored. ----
+const MIMIC_KEY = 'fly.mimic';
+const mimicCfg = { on: false, mirror: true, smooth: 0.5 };
+try {
+  const j = JSON.parse(localStorage.getItem(MIMIC_KEY) || '{}');
+  if (typeof j.on === 'boolean') mimicCfg.on = j.on;
+  if (typeof j.mirror === 'boolean') mimicCfg.mirror = j.mirror;
+  if (typeof j.smooth === 'number') mimicCfg.smooth = Math.min(1, Math.max(0, j.smooth));
+} catch (_) { /* storage blocked: defaults (off) */ }
+function saveMimicCfg() { try { localStorage.setItem(MIMIC_KEY, JSON.stringify(mimicCfg)); } catch (_) { /* ignore */ } }
+const mimic = createMimic({ mirror: mimicCfg.mirror, smoothness: mimicCfg.smooth, enabled: mimicCfg.on });
+const mim = { sample: null, statusText: null, boingAt: -1e9, squeakAt: -1e9, armed: { L: true, R: true }, hopHi: false };
+const copyOn = () => mimicCfg.on && cam.running; // Copy me is switched on AND a camera (real or mock) is feeding it
+
+function mimicSfx(smp, now) {
+  if (smp.weight < 0.3) { mim.hopHi = false; return; }
+  const hopHi = smp.rig.hop > 0.5;
+  if (hopHi && !mim.hopHi && now - mim.boingAt > 900) { mim.boingAt = now; engine.playBoing(); }
+  mim.hopHi = hopHi;
+  for (const s of ['L', 'R']) {
+    const v = smp.rig['leg' + s];
+    if (v > 0.7 && mim.armed[s] && now - mim.squeakAt > 1200) { mim.squeakAt = now; mim.armed[s] = false; engine.playSqueak(); }
+    else if (v < 0.35) mim.armed[s] = true;
+  }
+}
+function updateMimicStatus(smp) {
+  let text = '', cls = '';
+  if (mimicCfg.on) {
+    if (!cam.running) { text = cam.starting ? 'Camera starting...' : 'Press Camera so the fly can see you'; cls = 'warn'; }
+    else if (smp.status === 'paused') text = 'Paused while the fly works';
+    else if (smp.status === 'calibrating') { text = 'Calibrating: stand still'; cls = 'warn'; }
+    else if (smp.status === 'lost') { text = 'No body found'; cls = 'warn'; }
+    else { text = 'Copying you'; cls = 'on'; }
+  }
+  if (text !== mim.statusText) { mim.statusText = text; const n = $('mimic-status'); n.textContent = text; n.className = 'mimic-status ' + cls; }
+}
+
+// Runs once per rendered frame, before the scene moves the fly (see fly-scene.js setFrameHook).
+function onSceneFrame({ dt, t, state: st }) {
   const now = performance.now();
-  const dt = Math.min(0.05, (now - rig.last) / 1000);
-  rig.last = now;
-  if (!rig.fly || !rig.fly.parent) rig.fly = findFly(sc);
-  const f = rig.fly;
-  if (!f) return;
-  const st = scene.state;
   const busy = st === 'deciding' || st === 'landing';        // never fight the decision flight, landed or not
   if (busy) rig.rx = null;
   if (now - rig.target.at > 900) rig.target.on = false;      // attention goes stale when the camera stops sending
@@ -1069,19 +1094,20 @@ function rigFrame(sc, cam) {
     const p = r.t / r.dur;
     if (p >= 1) rig.rx = null;
     else if (r.name === 'startled') { const env = r.t < 0.12 ? r.t / 0.12 : Math.exp(-(r.t - 0.12) * 3.2); dx += r.dir * 1.7 * env; dy += 0.55 * env; flap = env; }
-    else if (r.name === 'spin') { spin = Math.PI * 2 * smooth01(p); dy += Math.sin(p * Math.PI) * 0.35; flap = 0.5; }
+    else if (r.name === 'spin') { spin = Math.PI * 2 * smooth01(p); dy += Math.sin(p * Math.PI) * 0.35; flap = r.noFlap ? 0 : 0.5; }
     else if (r.name === 'happy') { const env = Math.sin(p * Math.PI); dy += Math.abs(Math.sin(r.t * 9)) * 0.45 * env; flap = 0.7 * env; }
     else if (r.name === 'lean_left' || r.name === 'lean_right') { const env = Math.sin(p * Math.PI); dx += (r.name === 'lean_left' ? -1 : 1) * 1.6 * Math.min(1, env * 1.6); yaw += (r.name === 'lean_left' ? -1 : 1) * 0.4 * env; }
   }
-  f.position.x += dx; f.position.y += dy;
-  f.rotation.y += yaw + spin;
-  if (flap > 0.05) { const w = Math.sin(now / 1000 * 46 * Math.PI) * 0.85 * flap; if (rig.wings[0]) rig.wings[0].rotation.z += w; if (rig.wings[1]) rig.wings[1].rotation.z -= w; }
-  if (cam && rig.follow > 0.001) cam.position.x -= rig.cur.x * 0.45 * rig.follow; // parallax: the view shifts a little against the fly
-}
-if (!THREE.WebGLRenderer.prototype.__flyRig) {
-  const orig = THREE.WebGLRenderer.prototype.render;
-  THREE.WebGLRenderer.prototype.render = function patchedRender(sc, cam) { try { rigFrame(sc, cam); } catch (_) { /* decoration only */ } return orig.call(this, sc, cam); };
-  THREE.WebGLRenderer.prototype.__flyRig = true;
+  scene.setOffsets({ dx, dy, yaw, spin, flap, camX: rig.cur.x * 0.45 * rig.follow }); // the view shifts a little against the fly
+
+  // Copy me: pause it whenever the scene's own state machine is mid-manoeuvre (thinking, listening, deciding flight); it fades back in once settled.
+  mimic.setPaused(!scene.settled);
+  const smp = mimic.sample(now);
+  mim.sample = smp;
+  scene.setPose(smp.rig);
+  scene.setPoseWeight(smp.weight);
+  if (mimicCfg.on) mimicSfx(smp, now);
+  updateMimicStatus(smp);
 }
 const flyApi = {
   // Returns true when the reaction was accepted. Ignored (not queued) while the fly is deciding or landing.
@@ -1089,6 +1115,12 @@ const flyApi = {
     if (!(name in REACTIONS) || !scene.ok) return false;
     const st = scene.state;
     if (st === 'deciding' || st === 'landing') return false;
+    if (copyOn() && scene.settled) {
+      // while Copy me is on the reactions become their mimic equivalents (no sliding, no wing flap on top of the pose)
+      if (name !== 'spin') { mimic.gesture({ name, ts: performance.now() }); return true; }
+      rig.rx = { name, t: 0, dur: REACTIONS[name], dir: 1, noFlap: true };
+      return true;
+    }
     rig.rx = { name, t: 0, dur: REACTIONS[name], dir: Math.random() < 0.5 ? -1 : 1 };
     return true;
   },
@@ -1139,9 +1171,13 @@ function onGesture(ev, test = false) {
   const plan = planAction(camCfg, ev, { lastAskTs, test });
   if (plan.ignored) return;
   let extra = '';
+  if (mimicCfg.on) mimic.gesture({ name: ev.name, side: ev.side, ts: performance.now() }); // Copy me: the fly acts the gesture out itself
   if (plan.meme) { const r = memes.show(ev.name); if (!r.shown) extra = `no meme: ${r.reason}`; }
   switch (plan.action) {
-    case 'fly': if (!flyApi.react(plan.reaction)) extra = extra || 'fly is busy'; break;
+    case 'fly':
+      if (copyOn()) extra = extra || 'copy me'; // the mimic already acts this gesture out; a canned reaction would fight it
+      else if (!flyApi.react(plan.reaction)) extra = extra || 'fly is busy';
+      break;
     case 'replay': if (voice) $('replay-voice').click(); else extra = extra || 'nothing to replay yet'; break;
     case 'mute': $('mute').click(); break;
     case 'preset1': case 'preset2': case 'preset3': {
@@ -1167,12 +1203,14 @@ const cam = createCamera({
   video: $('cam-video'), overlay: $('cam-overlay'), engine: camEngine,
   mock: camMock ? mockMod : null,
   onEvent: (ev) => onGesture(ev),
+  onPose: (ts, pose) => { if (mimicCfg.on) mimic.update({ ts, pose }); },
   onAttention: (a) => { if (a) flyApi.setAttention(a.x, a.y); else flyApi.setAttention(null); },
   onFrame: (st) => { $('cam-fps').textContent = `${st.fps} fps`; },
   onMockTick: (f) => {
     const name = f.item.name;
     if (camUi.now !== name) {
       camUi.now = name;
+      if (mimicCfg.on) { $('mock-caption').textContent = 'Mock pose: ' + (mockMod.DANCE_CAPTIONS[name] || name); $('mock-caption').hidden = false; }
       let before = true;
       for (const li of camUi.items) { li.classList.toggle('now', li.dataset.g === name); if (li.dataset.g === name) before = false; li.classList.toggle('done', before); }
     }
@@ -1184,6 +1222,7 @@ const cam = createCamera({
     $('cam-box').hidden = !(on || s === 'starting');
     $('cam-mockbadge').hidden = !camMock;
     $('cam-timeline').hidden = !camMock;
+    if (!on) $('mock-caption').hidden = true;
     $('cam-mode').textContent = st.mode === 'full' ? `pose + hands (${st.delegate || ''})` : st.mode === 'motion-only' ? 'motion only' : st.mode === 'mock' ? 'scripted' : '';
     camStatus(msg, s === 'error');
     if (!on) { $('cam-fps').textContent = '0 fps'; flyApi.setAttention(null); memes.clear(); }
@@ -1196,10 +1235,18 @@ $('cam-toggle').addEventListener('click', () => {
 $('cam-stop').addEventListener('click', () => cam.stop('Camera off.'));
 document.addEventListener('visibilitychange', () => { if (document.hidden && (cam.running || cam.starting)) cam.stop('Camera stopped because the tab was hidden.'); });
 addEventListener('pagehide', () => cam.stop(null, true));
-if (camMock) {
+// Mock camera: the timeline is the gesture tour, or the "Copy me" dance while Copy me is on
+function buildMockTimeline() {
+  if (!camMock) return;
+  const order = mimicCfg.on ? mockMod.DANCE_ORDER : mockMod.MOCK_ORDER;
+  camUi.items = []; camUi.now = null;
+  $('cam-timeline').textContent = '';
   $('cam-timeline').hidden = false;
-  for (const g of mockMod.MOCK_ORDER) { const li = el('li', '', GESTURE_TITLES[g] || g); li.dataset.g = g; camUi.items.push(li); $('cam-timeline').append(li); }
+  for (const g of order) { const li = el('li', '', (mimicCfg.on && mockMod.DANCE_CAPTIONS[g]) || GESTURE_TITLES[g] || g); li.dataset.g = g; camUi.items.push(li); $('cam-timeline').append(li); }
+  cam.mockSetOrder(order);
+  if (!mimicCfg.on) $('mock-caption').hidden = true;
 }
+buildMockTimeline();
 
 // ---- "Camera actions" panel ----
 function applyCamCfg(persist = true) {
@@ -1242,5 +1289,32 @@ applyCamCfg(false);
 if (camMock || params.has('mock') || params.get('debug') === '1') {
   window.__flyCamDebug = () => ({ running: cam.running, fps: cam.state.fps, lastGesture: camLastInfo, memesShown: memes.shown, mode: cam.state.mode, message: cam.state.message, frames: cam.state.frames, delegate: cam.state.delegate || null, initMs: cam.state.initMs || null });
   window.__flyApi = flyApi;
-  if (camMock) window.__flyCamMock = { play: (n) => cam.mockPlay(n), names: mockMod.MOCK_ORDER.slice(), test: (n) => onGesture({ name: n, confidence: 1, ts: performance.now(), test: true }, true) };
+  if (camMock) window.__flyCamMock = { play: (n) => cam.mockPlay(n), names: mockMod.MOCK_ORDER.slice(), freeze: (b) => cam.mockFreeze(b), danceNames: mockMod.DANCE_ORDER.slice(), test: (n) => onGesture({ name: n, confidence: 1, ts: performance.now(), test: true }, true) };
+}
+
+// ---- Copy me controls ----
+function syncMimicUi() {
+  $('mimic-on').checked = mimicCfg.on;
+  $('mimic-opts').hidden = !mimicCfg.on;
+  $('mimic-mirror').checked = mimicCfg.mirror;
+  $('mimic-smooth').value = String(Math.round(mimicCfg.smooth * 100));
+}
+syncMimicUi();
+$('mimic-on').addEventListener('change', () => {
+  mimicCfg.on = $('mimic-on').checked;
+  mimic.setEnabled(mimicCfg.on);
+  syncMimicUi(); saveMimicCfg(); buildMockTimeline();
+  if (mimicCfg.on) engine.unlock(); // lets the boing / squeak play
+});
+$('mimic-mirror').addEventListener('change', () => { mimicCfg.mirror = $('mimic-mirror').checked; mimic.setMirror(mimicCfg.mirror); saveMimicCfg(); });
+$('mimic-smooth').addEventListener('input', () => { mimicCfg.smooth = Number($('mimic-smooth').value) / 100; mimic.setSmoothness(mimicCfg.smooth); saveMimicCfg(); });
+$('mimic-recal').addEventListener('click', () => mimic.recalibrate());
+if (scene.ok) scene.setFrameHook(onSceneFrame);
+if (camMock || params.has('mock') || params.get('debug') === '1') {
+  // read-only snapshot of the rig the scene is showing now (plus the mimic's target) for the browser tests
+  window.__flyRigDebug = () => {
+    const smp = mim.sample || mimic.sample();
+    const cur = scene.ok ? scene.getPose() : { ...smp.rig, weight: smp.weight };
+    return { ...cur, target: { ...smp.rig, weight: smp.weight }, status: smp.status, calibrated: smp.calibrated, mirror: mimicCfg.mirror, copyOn: mimicCfg.on, state: scene.ok ? scene.state : null, settled: scene.ok ? scene.settled : null, rigKeys: RIG_KEYS, scripted: cam.state.mockItem || null };
+  };
 }

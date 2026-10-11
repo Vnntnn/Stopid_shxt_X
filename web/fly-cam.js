@@ -80,7 +80,7 @@ export function createCamera(opts) {
   let stream = null, pose = null, gesture = null, raf = 0, timer = 0, lastTick = 0, tickNo = 0, lastTs = 0, errStreak = 0;
   let motionCanvas = null, motionCtx = null, prevLuma = null, luma = null;
   let fpsStamp = 0, fpsCount = 0;
-  let mockT0 = 0, mockOffset = 0, mockTl = null;
+  let mockT0 = 0, mockOffset = 0, mockTl = null, mockOrder = null, mockFrozen = null;
   let seq = 0;
 
   const set = (s, msg) => { state.message = msg || ''; if (opts.onState) opts.onState(s, msg || '', state); };
@@ -123,6 +123,7 @@ export function createCamera(opts) {
 
   function handleResult(ts, poseLm, handsList, motion, handLandmarks) {
     drawOverlay(overlay, poseLm, handLandmarks);
+    if (opts.onPose) { try { opts.onPose(ts, poseLm); } catch (_) { /* decoration only */ } } // Copy me: raw landmarks stay in the page
     const evs = engine.update({ ts, pose: poseLm, hands: handsList, motion });
     for (const ev of evs) { state.lastGesture = ev.name; state.lastConfidence = ev.confidence; if (opts.onEvent) opts.onEvent(ev); }
     if (opts.onAttention) opts.onAttention(attentionFrom(poseLm, handLandmarks && handLandmarks[0]));
@@ -172,6 +173,7 @@ export function createCamera(opts) {
     const now = performance.now();
     tickNo += 1;
     const tl = mockTl;
+    if (mockFrozen != null) mockOffset = mockFrozen - (now - mockT0); // frozen: the scripted pose is held (screenshots, tests)
     const t = now - mockT0 + mockOffset;
     const f = opts.mock.mockFrameAt(tl, t);
     const ts = Math.max(lastTs + 1, now); lastTs = ts;
@@ -192,7 +194,7 @@ export function createCamera(opts) {
     lastTs = 0; tickNo = 0; fpsStamp = 0; fpsCount = 0; state.fps = 0; state.frames = 0; state.lastGesture = null; state.lastConfidence = 0; errStreak = 0; prevLuma = null;
     try {
       if (opts.mock) {
-        mockTl = opts.mock.buildTimeline(); mockT0 = performance.now(); mockOffset = 0;
+        mockTl = opts.mock.buildTimeline(mockOrder || undefined); mockT0 = performance.now(); mockOffset = 0;
         state.mode = 'mock'; state.running = true; state.starting = false;
         timer = setInterval(tickMock, Math.round(1000 / maxFps));
         set('on', 'Mock camera: scripted gestures, no real camera.');
@@ -263,5 +265,15 @@ export function createCamera(opts) {
       return true;
     },
     get mockTimeline() { return mockTl; },
+    // mock only: hold the timeline at its current position (or release it)
+    mockFreeze(on) { if (!mockTl) return false; mockFrozen = on ? (performance.now() - mockT0 + mockOffset) : null; return true; },
+    // mock only: switch to another scripted order (e.g. the Copy me dance) and restart it from the top
+    mockSetOrder(order) {
+      mockOrder = order || null;
+      if (!state.running || !opts.mock) return false;
+      engine.reset();
+      mockTl = opts.mock.buildTimeline(mockOrder || undefined); mockT0 = performance.now(); mockOffset = 0;
+      return true;
+    },
   };
 }
