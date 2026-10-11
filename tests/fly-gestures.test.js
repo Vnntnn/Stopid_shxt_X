@@ -24,7 +24,7 @@ const stand = async (ms, noise = 0) => { const m = await loadM(); return m.build
 
 const BODY_POS = [
   ['wave', 'wave', 0.2], ['hands_up', 'hands_up', 0.3], ['hand_up_left', 'hand_up_left', 0.25], ['hand_up_right', 'hand_up_right', 0.25],
-  ['t_pose', 't_pose', 0.35], ['clap', 'clap', 0.2], ['lean_left', 'lean_left', 0.2], ['lean_right', 'lean_right', 0.2], ['jump', 'jump', 0.15], ['squat', 'squat', 0.3],
+  ['t_pose', 't_pose', 0.35], ['clap', 'clap', 0.2], ['lean_left', 'lean_left', 0.2], ['lean_right', 'lean_right', 0.2], ['jump', 'jump', 0.15], ['squat', 'squat', 0.3], ['belly_rub', 'belly_rub', 0.2],
 ];
 
 for (const [scn, expected, nearAmp] of BODY_POS) {
@@ -318,4 +318,53 @@ test('planAction: "ask" needs the master toggle, a 0.8 s hold and a 10 s cooldow
   // jump/wave/clap carry no hold, so they can never trigger an ask
   c.askEnabled = true; c.rows.jump.action = 'ask';
   assert.equal(planAction(c, { name: 'jump', ts: 1e6 }).blocked, 'ask-hold');
+});
+
+// ---- belly_rub ----
+test('belly_rub: hand resting still on the belly does not fire', async () => {
+  const m = await loadM();
+  const frames = [];
+  for (let t = 0; t <= 5000; t += 66.7) frames.push({ ts: t, pose: m.standingPose({ rw: [0.47, 0.75], re: [0.42, 0.62] }), hands: undefined });
+  assert.deepEqual(names(await play(frames)), []);
+  const noisy = (await scene('belly_rub', { amp: 0, noise: 0.004, seed: 4 }));
+  assert.deepEqual(names(await play(noisy.frames)), []);
+});
+test('belly_rub: waving above the shoulder, a clap in front of the torso and a two-handed low clap do not fire it', async () => {
+  const m = await loadM();
+  for (const g of ['wave', 'clap', 'hands_up']) assert.ok(!names(await play((await scene(g)).frames)).includes('belly_rub'), g);
+  const frames = [];  // both hands rubbing/clapping low and together
+  for (let t = 0; t <= 4000; t += 66.7) { const x = 0.06 * Math.cos(t / 1000 * 6.9) ; frames.push({ ts: t, pose: m.standingPose({ lw: [0.5 + x + 0.02, 0.75], rw: [0.5 - x - 0.02, 0.75] }) }); }
+  assert.ok(!names(await play(frames)).includes('belly_rub'));
+});
+test('belly_rub: the hand has to be on the lower torso (circling at chest height is not a belly rub)', async () => {
+  const m = await loadM();
+  const frames = [];
+  for (let t = 0; t <= 4000; t += 66.7) frames.push({ ts: t, pose: m.standingPose({ rw: [0.47 + Math.cos(t / 1000 * 13.8) * 0.045, 0.52 + Math.sin(t / 1000 * 13.8) * 0.045] }) });
+  assert.ok(!names(await play(frames)).includes('belly_rub'));
+  const side = [];  // low but outside to the side of the body
+  for (let t = 0; t <= 4000; t += 66.7) side.push({ ts: t, pose: m.standingPose({ rw: [0.30 + Math.cos(t / 1000 * 13.8) * 0.045, 0.75 + Math.sin(t / 1000 * 13.8) * 0.045] }) });
+  assert.ok(!names(await play(side)).includes('belly_rub'));
+});
+test('belly_rub: needs about 0.6 s of rubbing, fires once per rub, again after the cooldown, and honours sensitivity', async () => {
+  const m = await loadM();
+  const s = m.buildScene('belly_rub');
+  const evs = await play(s.frames);
+  assert.equal(evs.length, 1);
+  assert.ok(evs[0].ts - s.restMs >= 600, `fired after only ${evs[0].ts - s.restMs} ms`);
+  const a = m.buildScene('belly_rub'), b = m.buildScene('belly_rub', { t0: a.endTs + 200, rest: 200 }), c = m.buildScene('belly_rub', { t0: b.endTs + 6000, rest: 1000 });
+  const all = await play([...a.frames, ...b.frames, ...c.frames]);
+  assert.ok(all.length >= 2 && all.length <= 3, JSON.stringify(all.map((e) => e.ts)));
+  for (let i = 1; i < all.length; i++) assert.ok(all[i].ts - all[i - 1].ts >= 3000);
+  const { thresholds } = await loadG();
+  assert.ok(thresholds('low').belly_rub.swing > thresholds('normal').belly_rub.swing && thresholds('normal').belly_rub.swing > thresholds('high').belly_rub.swing);
+  assert.ok(thresholds('low').belly_rub.windowMs > thresholds('high').belly_rub.windowMs);
+  // a gentler rub (70% size) is caught by high sensitivity but not by low
+  const gentle = m.buildScene('belly_rub', { amp: 0.7 });
+  assert.ok(names(await play(gentle.frames, { sensitivity: 'high' })).includes('belly_rub'));
+  assert.ok(!names(await play(gentle.frames, { sensitivity: 'low' })).includes('belly_rub'));
+});
+test('belly_rub default action is a meme', async () => {
+  const { defaultActionsConfig, GESTURE_TITLES } = await loadG();
+  assert.deepEqual(defaultActionsConfig().rows.belly_rub, { meme: true, action: 'none' });
+  assert.equal(GESTURE_TITLES.belly_rub, 'Belly rub');
 });

@@ -14,13 +14,13 @@
 // Every threshold is a [low, normal, high] triple: "low" sensitivity = harder to trigger.
 
 export const SENSITIVITIES = ['low', 'normal', 'high'];
-export const BODY_GESTURES = ['wave', 'hands_up', 'hand_up_left', 'hand_up_right', 't_pose', 'clap', 'lean_left', 'lean_right', 'jump', 'squat'];
+export const BODY_GESTURES = ['wave', 'hands_up', 'hand_up_left', 'hand_up_right', 't_pose', 'clap', 'lean_left', 'lean_right', 'jump', 'squat', 'belly_rub'];
 export const HAND_GESTURES = ['thumbs_up', 'thumbs_down', 'peace', 'open_palm', 'fist', 'point_up', 'i_love_you'];
 export const GESTURES = [...BODY_GESTURES, ...HAND_GESTURES];
 export const HAND_LABELS = { Thumb_Up: 'thumbs_up', Thumb_Down: 'thumbs_down', Victory: 'peace', Open_Palm: 'open_palm', Closed_Fist: 'fist', Pointing_Up: 'point_up', ILoveYou: 'i_love_you' };
 export const GESTURE_TITLES = {
   wave: 'Wave', hands_up: 'Both hands up', hand_up_left: 'Left hand up', hand_up_right: 'Right hand up', t_pose: 'T-pose', clap: 'Clap',
-  lean_left: 'Lean left', lean_right: 'Lean right', jump: 'Jump', squat: 'Squat',
+  lean_left: 'Lean left', lean_right: 'Lean right', jump: 'Jump', squat: 'Squat', belly_rub: 'Belly rub',
   thumbs_up: 'Thumbs up', thumbs_down: 'Thumbs down', peace: 'Peace', open_palm: 'Open palm', fist: 'Fist', point_up: 'Point up', i_love_you: 'I love you',
 };
 
@@ -77,6 +77,13 @@ export const THRESHOLDS = {
     holdMs: [350, 250, 150],
     scaleTol: [0.2, 0.2, 0.25],
     cooldownMs: [3000, 2500, 2000],
+  },
+  belly_rub: {                          // one wrist circling / rubbing inside the lower-torso box
+    windowMs: [900, 700, 600],          // sustained motion needed (>= ~0.6 s at normal)
+    swing: [0.35, 0.25, 0.19],          // min stroke between direction changes, in sw (never below MIN_ABS image units)
+    reversals: [3, 2, 2],               // direction changes on the busier axis (a full circle gives 2 per axis)
+    pathMin: [1.0, 0.6, 0.4],           // total hand path inside the window, in sw (a hand resting still travels about 0)
+    cooldownMs: [3500, 3000, 2500],
   },
   hand: {                               // all hand-label gestures
     minScore: [0.75, 0.6, 0.45],        // Gesture Recognizer confidence
@@ -149,7 +156,10 @@ function metricsOf(pose) {
   const dirSign = ls.x >= rs.x ? 1 : -1; // person's left is at larger x when facing the camera
   const w = (i) => (vis(pose[i]) ? pose[i] : null);
   const shY = (ls.y + rs.y) / 2;
-  return { sw, nose, ls, rs, shX: (ls.x + rs.x) / 2, shY, dirSign, lw: w(POSE.L_WR), rw: w(POSE.R_WR), le: w(POSE.L_EL), re: w(POSE.R_EL), bodyY: (shY * 2 + nose.y) / 3 };
+  const lh = w(POSE.L_HIP), rh = w(POSE.R_HIP);
+  // Hips are often out of frame: estimate them from the shoulders (torso is about 1.5 shoulder widths long).
+  const hipY = lh && rh ? (lh.y + rh.y) / 2 : shY + 1.5 * sw;
+  return { hipY, sw, nose, ls, rs, shX: (ls.x + rs.x) / 2, shY, dirSign, lw: w(POSE.L_WR), rw: w(POSE.R_WR), le: w(POSE.L_EL), re: w(POSE.R_EL), bodyY: (shY * 2 + nose.y) / 3 };
 }
 
 export function createGestureEngine(opts = {}) {
@@ -292,6 +302,44 @@ export function createGestureEngine(opts = {}) {
         if (val < ln.offset * ln.rearm) S(name).armed = true;
       }
 
+      // ----- belly rub: one wrist circling/oscillating on the lower torso (coordinates relative to the shoulder midpoint) -----
+      const br = T.belly_rub;
+      {
+        const win = recent(ts, br.windowMs).filter((f) => f.m);
+        const okWin = win.length >= 6 && win[win.length - 1].ts - win[0].ts >= br.windowMs * 0.85;
+        let best = null;
+        if (okWin) {
+          for (const [which, other, side] of [['lw', 'rw', 'left'], ['rw', 'lw', 'right']]) {
+            const inBox = (f, w) => {
+              if (!w) return false;
+              const half = f.m.sw / 2 + 0.1 * f.m.sw, midY = (f.m.shY + f.m.hipY) / 2;
+              return Math.abs(w.x - f.m.shX) <= half && w.y >= midY && w.y <= f.m.hipY + 0.2 * f.m.sw;
+            };
+            const mine = win.filter((f) => f.m[which]);
+            if (mine.length < win.length * 0.9) continue;
+            if (mine.filter((f) => inBox(f, f.m[which])).length < mine.length * 0.85) continue;
+            // exactly one wrist: if the other one is in the box too, or right next to this one, it is a clap / a two-handed thing
+            if (win.filter((f) => inBox(f, f.m[other]) || (f.m[other] && f.m[which] && Math.hypot(f.m[other].x - f.m[which].x, f.m[other].y - f.m[which].y) < 0.3 * f.m.sw)).length > win.length * 0.2) continue;
+            const rx = smooth3(mine.map((f) => (f.m[which].x - f.m.shX) / f.m.sw)), ry = smooth3(mine.map((f) => (f.m[which].y - f.m.shY) / f.m.sw));
+            const sw0 = median(mine.map((f) => f.m.sw));
+            const minSwing = Math.max(br.swing, MIN_ABS / sw0);
+            const cx = countReversals(rx, minSwing), cy = countReversals(ry, minSwing);
+            let path = 0;
+            for (let i = 1; i < rx.length; i++) path += Math.hypot(rx[i] - rx[i - 1], ry[i] - ry[i - 1]);
+            const revs = Math.max(cx.count, cy.count);
+            if (revs >= br.reversals && path >= br.pathMin && (!best || path > best.path)) best = { side, path, revs };
+          }
+        }
+        if (best) emit(out, 'belly_rub', conf(0.3 + 0.2 * (best.revs - br.reversals) + (best.path / br.pathMin - 1) * 0.3), ts, best.side, br.cooldownMs);
+        else if (okWin) {
+          // re-arm once the rubbing has stopped (the hand rests, leaves the box or moves away)
+          const last = recent(ts, 500).filter((f) => f.m);
+          let still = true;
+          for (const which of ['lw', 'rw']) { const ps = last.map((f) => f.m[which]).filter(Boolean); if (ps.length > 3) { let pl = 0; for (let i = 1; i < ps.length; i++) pl += Math.hypot(ps[i].x - ps[i - 1].x, ps[i].y - ps[i - 1].y); if (pl / (last[0].m.sw) > 0.25) still = false; } }
+          if (still) S('belly_rub').armed = true;
+        }
+      }
+
       // ----- jump -----
       const jp = T.jump;
       const rec = recent(ts, jp.windowMs).filter((f) => f.m);
@@ -389,14 +437,14 @@ export const ACTION_LABELS = {
 export const ASK_HOLD_MS = 800;
 export const ASK_COOLDOWN_MS = 10000;
 export const FLY_REACTIONS = {
-  wave: 'startled', jump: 'startled', clap: 'spin', thumbs_up: 'happy', hands_up: 'happy', squat: 'startled', t_pose: 'spin',
+  wave: 'startled', jump: 'startled', clap: 'spin', thumbs_up: 'happy', hands_up: 'happy', squat: 'startled', t_pose: 'spin', belly_rub: 'happy',
   lean_left: 'lean_left', lean_right: 'lean_right', hand_up_left: 'happy', hand_up_right: 'happy',
   thumbs_down: 'startled', peace: 'happy', open_palm: 'happy', fist: 'startled', point_up: 'happy', i_love_you: 'happy',
 };
 const DEFAULT_ROWS = {
   wave: { meme: true, action: 'fly' }, hands_up: { meme: true, action: 'none' }, hand_up_left: { meme: true, action: 'none' }, hand_up_right: { meme: true, action: 'none' },
   t_pose: { meme: true, action: 'none' }, clap: { meme: true, action: 'fly' }, lean_left: { meme: false, action: 'fly' }, lean_right: { meme: false, action: 'fly' },
-  jump: { meme: true, action: 'fly' }, squat: { meme: true, action: 'none' },
+  jump: { meme: true, action: 'fly' }, squat: { meme: true, action: 'none' }, belly_rub: { meme: true, action: 'none' },
   thumbs_up: { meme: true, action: 'replay' }, thumbs_down: { meme: true, action: 'none' }, peace: { meme: true, action: 'none' },
   open_palm: { meme: false, action: 'none' }, fist: { meme: true, action: 'none' }, point_up: { meme: true, action: 'none' }, i_love_you: { meme: true, action: 'none' },
 };

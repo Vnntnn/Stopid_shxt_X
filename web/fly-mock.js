@@ -235,6 +235,7 @@ export const MOCK_SCENES = {
   lean_left: { dur: 1800, rest: 800, pose: (t, a) => ({ noseDx: 0.12 * ease(t / 0.4) * a, shDx: 0.02 * ease(t / 0.4) * a }) },
   lean_right: { dur: 1800, rest: 800, pose: (t, a) => ({ noseDx: -0.12 * ease(t / 0.4) * a, shDx: -0.02 * ease(t / 0.4) * a }) },
   jump: { dur: 1500, rest: 2200, pose: (t, a) => ({ dy: t < 0.6 ? -0.10 * Math.sin(Math.PI * t / 0.6) * a : 0 }) },
+  belly_rub: { dur: 2200, rest: 800, pose: (t, a) => { const k = ease(t / 0.3), r = 0.045 * a, c = [0.47, 0.75]; return { rw: [0.40 + (c[0] + Math.cos(TAU * 2.2 * t) * r - 0.40) * k, 0.70 + (c[1] + Math.sin(TAU * 2.2 * t) * r - 0.70) * k], re: [0.42, 0.62] }; } },
   squat: { dur: 2200, rest: 3600, pose: (t, a) => ({ dy: 0.12 * a * ease(t / 0.7) * (t < 1.6 ? 1 : 1 - ease((t - 1.6) / 0.5)) }) },
 };
 // ---- "Copy me" dance: held poses with a 0.3 s ease-in, standing in between. Names start with d_ (the others are reused as they are). ----
@@ -258,7 +259,7 @@ const sceneOf = (name) => MOCK_SCENES[name] || DANCE_SCENES[name];
 
 const HAND_SCENES = { thumbs_up: 'Thumb_Up', thumbs_down: 'Thumb_Down', peace: 'Victory', open_palm: 'Open_Palm', fist: 'Closed_Fist', point_up: 'Pointing_Up', i_love_you: 'ILoveYou' };
 for (const [g, label] of Object.entries(HAND_SCENES)) MOCK_SCENES[g] = { dur: 1700, rest: 700, pose: () => ({}), hands: () => [{ label, score: 0.93 }] };
-export const MOCK_ORDER = ['wave', 'hands_up', 'hand_up_left', 'hand_up_right', 't_pose', 'clap', 'lean_left', 'lean_right', 'jump', 'squat', 'thumbs_up', 'thumbs_down', 'peace', 'open_palm', 'fist', 'point_up', 'i_love_you'];
+export const MOCK_ORDER = ['wave', 'hands_up', 'hand_up_left', 'hand_up_right', 't_pose', 'clap', 'lean_left', 'lean_right', 'jump', 'squat', 'belly_rub', 'thumbs_up', 'thumbs_down', 'peace', 'open_palm', 'fist', 'point_up', 'i_love_you'];
 
 // Frames of one scene: [{ts, pose, hands}] starting at ts = t0, restMs of standing first. noise = sigma on x/y.
 export function buildScene(name, { t0 = 0, fps = 15, amp = 1, noise = 0, seed = 1, rest, tail = 500, handEvery = 2 } = {}) {
