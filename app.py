@@ -126,7 +126,9 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title="On-Fly-Jev Local Lab", lifespan=lifespan)
-app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver"])
+# ONFLY_ALLOWED_HOSTS: comma-separated extra hosts, e.g. a tunnel domain ("*.ngrok-free.app").
+extra_hosts = [h.strip() for h in os.environ.get("ONFLY_ALLOWED_HOSTS", "").split(",") if h.strip()]
+app.add_middleware(TrustedHostMiddleware, allowed_hosts=["localhost", "127.0.0.1", "testserver", *extra_hosts])
 app.mount("/static", StaticFiles(directory=ROOT / "web"), name="static")
 project_store.init_db()
 
